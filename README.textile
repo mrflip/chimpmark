@@ -10,7 +10,10 @@ Why?
 * Compare clusters of equivalent nominal power (CPU, cores, memory) across data centers or hardware configs: AWS vs Rackspace vs private cluster: go!
 * Different core technologies (pig vs. wukong vs. raw Java) can compete on run time, efficiency, elegance, and size of code. 
 
-The jobs have been chosen to each exercise typical atomic operations. For example, the runtime for "take rollup counts on a giant spreadsheet" is largely dominated by the GROUP operation it entails. The generic
+Each problem is meant to a) to be a real-world task, b) to nonetheless encapsulate a very small, generic number of operations. For instance, adjacency pairs => adjacency list on the wikipedia link graph is really just a GROUP, but in particular it's a group on very small records with median multiplicity of ~5, maximum in the thousands, and low skew.
+
+**Note: this is a planning document: the repo contains no code yet**. There's a great variety of example code -- the foundations of what will appear here -- in the "wukong repo":http://github.com/infochimps/wukong/tree/master/examples/
+
 
 h2. Goals:
 
