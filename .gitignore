@@ -1,16 +1,15 @@
-## MAC OS
-.DS_Store
+# version control
+.svn
+.hg
+.bzr
 
-## TEXTMATE
-*.tmproj
-tmtags
-
-## EMACS
+# editors
 *~
 \#*
-.\#*
-
-## VIM
+\.#*
+*.tmproj
+tmtags
+TAGS
 *.swp
 
 ## PROJECT::GENERAL
@@ -18,4 +17,7 @@ coverage
 rdoc
 pkg
 
-## PROJECT::SPECIFIC
+# miscellaneous
+.DS_Store
+.bak
+*DO_NOT_VERSION*

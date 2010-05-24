@@ -4,14 +4,14 @@ require 'rake'
 begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
-    gem.name = "chimpmark"
-    gem.summary = %Q{ChimpMARK-2010 is a collection of massive real-world datasets, interesting real-world problems, and simple example code to solve them. Learn Big Data processing, benchmark your cluster, or compete on implementation!}
-    gem.description = %Q{ChimpMARK-2010 is a collection of massive real-world datasets, interesting real-world problems, and simple example code to solve them. Learn Big Data processing, benchmark your cluster, or compete on implementation!}
-    gem.email = "coders@infochimps.org"
-    gem.homepage = "http://github.com/infochimps/chimpmark"
-    gem.authors = ["Philip (flip) Kromer"]
+    gem.name         = "chimpmark"
+    gem.summary      = %Q{ChimpMARK-2010 is a collection of massive real-world datasets, interesting real-world problems, and simple example code to solve them. Learn Big Data processing, benchmark your cluster, or compete on implementation!}
+    gem.description  = %Q{ChimpMARK-2010 is a collection of massive real-world datasets, interesting real-world problems, and simple example code to solve them. Learn Big Data processing, benchmark your cluster, or compete on implementation!}
+    gem.email        = "coders@infochimps.org"
+    gem.homepage     = "http://github.com/infochimps/chimpmark"
+    gem.authors      = ["Philip (flip) Kromer for Infochimps", "Jacob Perkins"]
     gem.add_development_dependency "rspec", ">= 1.2.9"
-    gem.add_development_dependency "yard", ">= 0"
+    gem.add_development_dependency "yard",  ">= 0"
     # gem is a Gem::Specification... see http://www.rubygems.org/read/chapter/20 for additional settings
   end
   Jeweler::GemcutterTasks.new
