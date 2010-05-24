@@ -137,7 +137,7 @@ h2. Tasks:
 |_. Parse                                        |                         |                                                    |
 |                                                |                         |                                                    |
 |  extract title, keyword, desc from HTML head   | long documents          |                                                    |
-|  extract all <a> and <img> etc URLs from HTML  | long documents          |                                                    |
+|  extract all a and img etc URLs from HTML      | long documents          |                                                    |
 |                                                |                         |                                                    |
 |_. OLAP / Stats                                 |                         |                                                    |
 |  simple statistics: avg, stdev, counts         | spreadsheet             | GROUP, FOREACH                                     |
