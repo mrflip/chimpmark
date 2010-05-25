@@ -8,7 +8,7 @@ Why?
 * With known data and code, you can performance-qualify cluster. How fast should a join run on a 10-machine cluster of m1.large instances?
 * Understand what cluster settings should be tuned in response to job characterstics.
 * Compare clusters of equivalent nominal power (CPU, cores, memory) across data centers or hardware configs: AWS vs Rackspace vs private cluster: go!
-* Different core technologies (pig vs. wukong vs. raw Java) can compete on run time, efficiency, elegance, and size of code. 
+* Different core technologies (pig vs. wukong vs. raw Java) can compete on run time, efficiency, elegance, and size of code.
 
 Each problem is meant to a) to be a real-world task, b) to nonetheless encapsulate a very small, generic number of operations. For instance, adjacency pairs => adjacency list on the wikipedia link graph is really just a GROUP, but in particular it's a group on very small records with median multiplicity of ~5, maximum in the thousands, and low skew.
 
@@ -42,7 +42,7 @@ bq. Contains a wikipedia linkgraph dataset provided by Henry Haselgrove.
       ...
 </code></pre>
   where from1 is an integer labelling a page that has links from it, and to11 to12 to13 ... are integers labelling all the pages that the page links to. To find the page title that corresponds to integer n, just look up the n-th line in the file titles-sorted.txt.
-  
+
 h3. Short Documents 1: ???
 
 uniform ~150-200 char fields + metadata
@@ -68,7 +68,7 @@ h4. Wikipedia Traffic Statistics Dataset
 	en Barack_Obama_%22Hope%22_poster         5 102081
 </code></pre>
 
-   we should denormalize into 
+   we should denormalize into
 
 <pre><code>
         date 	hour	en Barack_Obama                         997 123091092
@@ -84,38 +84,41 @@ h3. Spreadsheet-ish: (Business and Industry Summary Data?)
 Choices:
 * "Business and Industry Summary Data":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2342&categoryID=248
 * "2003-2006 US Economic Data":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2341&categoryID=248
-  
+
 h2. Tasks:
 
+|_. Problem                                      | Dataset                 | Operations exercised                               |
+|                                                |                         |                                                    |
 |_. Cat wrangling                                |                         |                                                    |
 |  uniq -c                                       | short documents         | distinct, count                                    |
 |  uniq -c                                       | long documents          | distinct, count                                    |
 |  sort on numeric field, 1k-char records        | wp traffic statistics   | ORDER                                              |
 |  sort on numeric field, 6 numeric columns      | spreadsheet             | ORDER                                              |
 |  sort wp by page titles                        | wp                      | ORDER                                              |
-|  create inverted index                         | long documents          |                                                    |
-|  word count                                    |                         |                                                    |
-|  uniform (x% random sample)                    | short documents         |                                                    |
-|  uniform (x% random sample)                    | long documents          |                                                    |
+|  create inverted index                         | long documents          | tokenize, group                                    |
+|  word count (simple tokenization)              | long documents          |                                                    |
+|  word count (advanced tokenization)            | long documents          |                                                    |
+|  uniform (x% random sample)                    | short documents         | FILTER                                             |
+|  uniform (x% random sample)                    | long documents          | FILTER                                             |
 |  make a single .gz file on non-HDFS            | human genome?           | want higher entropy                                |
 |  make a single .gz file on non-HDFS            | graph                   | want very low entropy                              |
-|  simple filter on 10k files, most smaller than | block size              |                                                    |
+|  simple filter on 10k files, most smaller than block size | constructed for task | job startup time                           |
 |                                                |                         |                                                    |
 |_. Graph                                        |                         |                                                    |
-|  turn adjacency pairs into adj list            |                         |                                                    |
-|  given adj. pairs get counts of in-links and out-links                   |                                                    |
-|  join the counts of in-links and out-links by node                       | JOIN that is 1:1                                   |
-|  pagerank                                      |                         |                                                    |
-|  put page titles and aggregated counts on adjacency list (something)?    | JOIN that is huge to big with 100% overlap         |
-|  breadth first search                          |                         |                                                    |
-|  1-clique                                      |                         |                                                    |
-|  sub-universe (get random sample, and corr. records from assoc. datasets) | graph + short documents |                                                    |
+|  turn adjacency pairs into adj list            | wp graph                | GROUP, no combiner                                 |
+|  given adj. pairs, get counts of in-links and out-links  | wp graph      | GROUP and COUNT, no combiner                       |
+|  join the counts of in-links and out-links by node | wp graph            | JOIN that is 1:1                                   |
+|  pagerank                                      | wp graph                | workflow; complex code                             |
+|  breadth first search                          | wp graph                | JOIN, very memory-intensive                        |
+|  1-clique                                      | breadth-first search    |                                                    |
+|  sub-universe (get random sample, and corr. records from assoc. datasets) | graph + short documents | complex code |  |
+|  put page titles and aggregated counts on adjacency list (something)? |  | JOIN that is huge to big with 100% overlap         |
 |                                                |                         |                                                    |
 |_. Filter                                       |                         |                                                    |
 |  filter on numeric criteria                    | spreadsheet             | FILTER                                             |
 |                                                |                         |                                                    |
-|  split on simple criteria into 5 files, every record to exactly 1 file   |                                                    |
-|  split on simple criteria into 5 files, records could go to some, none or any of the files                                    |
+|  split on simple criteria into 5 files: every record to exactly 1 file   | spreadsheet | SPLIT                                |
+|  split on simple criteria into 5 files: records could go to some, none or any of the files | spreadsheet | SPLIT              |
 |  regex search                                  | short documents         | FILTER, MATCHES                                    |
 |  100 keywords                                  | short documents         |                                                    |
 |  100 keywords                                  | long documents          |                                                    |
@@ -134,7 +137,7 @@ h2. Tasks:
 |                                                |                         |                                                    |
 |_. Misc                                         |                         |                                                    |
 |  render as JSON                                | spreadsheet?            | stream                                             |
- 
+
 h2. Atomic Operations to be exercised
 
 * group all
@@ -164,6 +167,6 @@ h2. Atomic Operations to be exercised
 * relative frequency => gutenberg
 *   group by document. => [doc  tok  doc_tok_count  doc_tok_freq doc_vocab]
 *   group by token.    => [     tok  all_tok_count  all_tok_freq avg_doc_tok_freq  * stdev_doc_tok_freq  tok_dispersion  tok_range ]
-*   group by 
+*   group by
 
 * parse XXX
