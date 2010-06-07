@@ -78,6 +78,7 @@ h2. Ideas for Tasks:
 |  simple statistics: avg, stdev, counts         | spreadsheet             | GROUP, FOREACH                                     |
 |  top-N: find top 100 pages by views per day    | wp traffic statistics   | GROUP, nested FOREACH                              |
 |  something very CPU-intensive in foreach       | [some bio dataset]      | CPU-intensive in inner loop                        |
+|  linear regression                             | spreadsheet             | ..                                                 |
 |                                                |                         |                                                    |
 |_. Geo                                          |                         |                                                    |
 |                                                |                         |                                                    |
@@ -85,6 +86,9 @@ h2. Ideas for Tasks:
 |                                                |                         |                                                    |
 |_. Misc                                         |                         |                                                    |
 |  render as JSON                                | spreadsheet?            | stream                                             |
+|                                                |                         |                                                    |
+|_. Infrastructure                               |                         |                                                    |
+|  count the characters in a single line file    | tiny file               | process overhead                                   |
 
 h2. Ideas for Atomic Operations to be exercised
 
