@@ -1,0 +1,47 @@
+
+
+
+
+
+
+h2. Document Dataset: Wikipedia English Articles XML
+
+A collection of
+  NNNN
+  
+  each line is an XML fragment representing one 
+
+
+
+
+h3. Challenges:
+
+* Validate the XML
+
+* Create a metadata table
+
+<page>    <title>AmericanSamoa</title>    <id>6</id>    <revision>      <id>133452270</id>      <timestamp>2007-05-25T17:12:06Z</timestamp>      <contributor>        <username>Gurch</username>        
+<page>    <title>AppliedEthics</title>    <id>8</id>    <revision>      <id>133452279</id>      <timestamp>2007-05-25T17:12:09Z</timestamp>      <contributor>        <username>Gurch</username>        
+<page>    <title>AccessibleComputing</title>    <id>10</id>    <revision>      <id>133452289</id>      <timestamp>2007-05-25T17:12:12Z</timestamp>      <contributor>        <username>Gurch</username> 
+<page>    <title>Anarchism</title>    <id>12</id>    <revision>      <id>275854375</id>      <timestamp>2009-03-08T18:35:46Z</timestamp>      <contributor>        <username>Jadabocho</username>       
+<page>    <title>AfghanistanHistory</title>    <id>13</id>    <revision>      <id>74466652</id>      <timestamp>2006-09-08T04:15:52Z</timestamp>      <contributor>        <username>Rory096</username> 
+<page>    <title>AfghanistanGeography</title>    <id>14</id>    <revision>      <id>74466619</id>      <timestamp>2006-09-08T04:15:36Z</timestamp>      <contributor>        <username>Rory096</username
+<page>    <title>AfghanistanPeople</title>    <id>15</id>    <revision>      <id>135089040</id>      <timestamp>2007-06-01T13:59:37Z</timestamp>      <contributor>        <username>RussBot</username> 
+<page>    <title>AfghanistanEconomy</title>    <id>17</id>    <revision>      <id>74466531</id>      <timestamp>2006-09-08T04:14:58Z</timestamp>      <contributor>        <username>Rory096</username> 
+<page>    <title>AfghanistanCommunications</title>    <id>18</id>    <revision>      <id>74466499</id>      <timestamp>2006-09-08T04:14:42Z</timestamp>      <contributor>        <username>Rory096</use
+<page>    <title>AfghanistanTransportations</title>    <id>19</id>    <revision>      <id>74466423</id>      <timestamp>2006-09-08T04:14:07Z</timestamp>      <contributor>        <username>Rory096</us
+<page>    <title>AfghanistanMilitary</title>    <id>20</id>    <revision>      <id>74466354</id>      <timestamp>2006-09-08T04:13:27Z</timestamp>      <contributor>        <username>Rory096</username>
+<page>    <title>AfghanistanTransnationalIssues</title>    <id>21</id>    <revision>      <id>46448859</id>      <timestamp>2006-04-01T12:08:42Z</timestamp>      <contributor>        <username>Gurch</
+<page>    <title>AssistiveTechnology</title>    <id>23</id>    <revision>      <id>74466798</id>      <timestamp>2006-09-08T04:17:00Z</timestamp>      <contributor>        <username>Rory096</username>
+<page>    <title>AmoeboidTaxa</title>    <id>24</id>    <revision>      <id>74466889</id>      <timestamp>2006-09-08T04:17:51Z</timestamp>      <contributor>        <username>Rory096</username>       
+<page>    <title>Autism</title>    <id>25</id>    <revision>      <id>275108378</id>      <timestamp>2009-03-05T05:36:47Z</timestamp>      <contributor>        <username>Eubulides</username>        <i
+<page>    <title>AlbaniaHistory</title>    <id>27</id>    <revision>      <id>74467016</id>      <timestamp>2006-09-08T04:18:56Z</timestamp>      <contributor>        <username>Rory096</username>     
+<page>    <title>AlbaniaGeography</title>    <id>28</id>    <revision>      <id>74466319</id>      <timestamp>2006-09-08T04:13:09Z</timestamp>      <contributor>        <username>Rory096</username>   
+<page>    <title>AlbaniaPeople</title>    <id>29</id>    <revision>      <id>74466817</id>      <timestamp>2006-09-08T04:17:12Z</timestamp>      <contributor>        <username>Rory096</username>      
+<page>    <title>AsWeMayThink</title>    <id>30</id>    <revision>      <id>74467061</id>      <timestamp>2006-09-08T04:19:17Z</timestamp>      <contributor>        <username>Rory096</username>       
+<page>    <title>AllSaints</title>    <id>33</id>    <revision>      <id>197516257</id>      <timestamp>2008-03-11T17:45:40Z</timestamp>      <contributor>        <username>TexasAndroid</username>    
+<page>    <title>AlbaniaGovernment</title>    <id>35</id>    <revision>      <id>74467128</id>      <timestamp>2006-09-08T04:19:45Z</timestamp>      <contributor>        <username>Rory096</username>  
+<page>    <title>AlbaniaEconomy</title>    <id>36</id>    <revision>      <id>74467158</id>      <timestamp>2006-09-08T04:19:59Z</timestamp>      <contributor>        <username>Rory096</username>     
+<page>    <title>Albedo</title>    <id>39</id>    <revision>      <id>270359501</id>      <timestamp>2009-02-13T02:40:12Z</timestamp>      <contributor>        <username>Renaissancee</username>       
+<page>    <title>AfroAsiaticLanguages</title>    <id>40</id>    <revision>      <id>74467202</id>      <timestamp>2006-09-08T04:20:21Z</timestamp>      <contributor>        <username>Rory096</username
+
