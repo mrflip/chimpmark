@@ -6,11 +6,38 @@
 
 h2. Document Dataset: Wikipedia English Articles XML
 
+http://meta.wikimedia.org/wiki/Data_dumps
+
+http://dumps.wikimedia.org/enwiki/latest/
+http://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
+
 A collection of
   NNNN
   
   each line is an XML fragment representing one 
 
+ 3 219 183 'good' articles
+19 677 204  total pages
+
+The main page data is provided in the same XML wrapper format that Special:Export produces for individual pages. It's fairly self-explanatory to look at, but there is some documentation at Help:Export.
+
+Three sets of page data are produced for each dump, depending on what you need:
+
+* pages-articles.xml
+** Contains current version of all article pages, templates, and other pages
+** Excludes discussion pages ('Talk:') and user "home" pages ('User:')
+** Recommended for republishing of content.
+* pages-meta-current.xml
+** Contains current version of all pages, including discussion and user "home" pages.
+* pages-meta-history.xml
+** Contains complete text of every revision of every page (can be very large!)
+** Recommended for research and archives.
+
+The XML itself contains complete, raw text of every revision, so in particular the full history files can be extremely large; en.wikipedia.org's January 2010 dump is about 5.87e12 bytes (5.34 TiB) raw.
+
+Several of the tables are also dumped with mysqldump should anyone find them useful (for the database definition, see the documentation [1]); the gzip-compressed SQL dumps (.sql.gz) can be read directly into a MySQL database but may be less convenient for other database formats.
+
+In addition, "stub" dumps with filenames like stub-meta-history.xml.gz, stub-meta-current.xml.gz, and stub-articles.xml.gz, contain header information only for pages and revisions, omitting the actual page content.  
 
 
 
