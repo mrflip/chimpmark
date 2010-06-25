@@ -1,6 +1,6 @@
 %default GRAPH  /data/rawd/wp/linkgraph/a_linksto_b
 %default TITLES /data/rawd/wp/article_info/article_titles
-%default OUTPUT /data/graph/count_in_links/pig/count_in_links
+%default OUTPUT /data/graph/count-in-links/pig/count-in-links
 
 graph = LOAD '$GRAPH' using PigStorage() as (from_id:int,to_id:int);
 graph_group = GROUP graph by to_id;
