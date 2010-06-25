@@ -1,0 +1,4 @@
+#!/bin/bash
+pig/run
+wukong/run
+pig check_difffs.pig

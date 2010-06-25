@@ -1,0 +1,3 @@
+#!/bin/bash
+hdp-mkdir /data/graph/count-in-links/pig
+

@@ -1,0 +1,2 @@
+#!/bin/bash
+hdp-rm -r /data/graph/count-in-links/teardown
