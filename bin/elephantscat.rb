@@ -12,7 +12,7 @@ Settings.resolve!
 #
 # FIXME: add these fields: started at, num_tasks, reduce_input_groups
 #
-NAMENODE_URL = "http://gibbon.infinitemonkeys.info"
+NAMENODE_URL = "http://chef.howeville.com"
 
 class JobDetails < TypedStruct.new(
     [:job_id,                String],
@@ -30,7 +30,11 @@ class JobDetails < TypedStruct.new(
     [:map_output_records,    Bignum],
     [:reduce_input_records,  Bignum],
     [:reduce_output_records, Bignum],
-    [:job_name,              String]
+    [:job_name,              String],
+    [:started_at,            String],
+    [:finished_at,           String],
+    [:map_tasks,            Integer],
+    [:reduce_tasks,         Integer]
     )
 end
 
@@ -49,12 +53,27 @@ class JobDetailsParser
     (finished.to_s.downcase == 'failed') ? 0 : 1
   end
 
+  def extract_num_table imw_obj
+    ripd = imw_obj.parse ["table[1]//tr", {:row => ["td"]}]
+    # we only want to keep the rows that have a bunch of elements
+    rawd = ripd.select {|ele| ele[:row] && ele[:row].length > 1}.map do |ele|
+      ele[:row]
+    end
+    rawd
+  end
+ 
   def extract_raw_table imw_obj
     ripd = imw_obj.parse ["table[2]//tr", {:row => ["td"]}]
     rawd = ripd.map do |ele|
       ele[:row][-4..-1] #cut off the crap at the beginning
     end
     rawd
+  end
+ 
+  def extract_top_table raw
+    table = {}
+    raw.scan(/^<b>([^:]+):<\/b>\s*(.*)\s*<br>/) {|key,value| table[key] = value}
+    return table;
   end
 
   #
@@ -73,13 +92,19 @@ class JobDetailsParser
   def parse jobdetails_file, &blk
     data       = IMW.open(jobdetails_file)
     raw_string = IMW.open(jobdetails_file).read
-    finished   = extract_finished raw_string
+    top_table  = extract_top_table raw_string
+    num_table  = extract_num_table IMW.open(jobdetails_file)
     rawd       = extract_raw_table data
     fixd       = raw_table_to_hash rawd
     fixd[:job_id]   = File.basename(jobdetails_file).gsub('.html', '')
     fixd[:run_time] = extract_header( raw_string, '(?:Finished|Killed) in')
     fixd[:job_name] = extract_header( raw_string, 'Job Name')
-    fixd[:finished] = finished
+    fixd[:finished] = top_table["Status"].to_s.downcase == "failed" ? 0 : 1
+    fixd[:started_at] = top_table["Started at"].to_s
+    fixd[:finished_at] = top_table["Finished at"].to_s
+    fixd[:map_tasks] = num_table[0][2]
+    fixd[:reduce_tasks] = num_table[1][2]
+ 
     yield JobDetails.from_hash(fixd)
   end
 
