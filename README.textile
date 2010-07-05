@@ -79,6 +79,7 @@ h2. Ideas for Tasks:
 |  top-N: find top 100 pages by views per day    | wp traffic statistics   | GROUP, nested FOREACH                              |
 |  something very CPU-intensive in foreach       | [some bio dataset]      | CPU-intensive in inner loop                        |
 |  linear regression                             | spreadsheet             | ..                                                 |
+|  assign percentiles                            | spreadsheet             | ..                                                 |
 |                                                |                         |                                                    |
 |_. Geo                                          |                         |                                                    |
 |                                                |                         |                                                    |
