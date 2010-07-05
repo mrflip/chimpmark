@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ruby count_in_links1.rb --rm --run=hadoop /data/rawd/wp/linkgraph/a_linksto_b /data/graph/count-in-links/wukong/temp
+ruby count_in_links2.rb --rm --run=hadoop /data/graph/count-in-links/wukong/temp/*,/data/rawd/wp/article_info/article_titles /data/graph/count-in-links/wukong/count-in-links

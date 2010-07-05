@@ -1,0 +1,2 @@
+#!/bin/bash
+pig count_in_links.pig
