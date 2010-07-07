@@ -152,13 +152,13 @@ class ArchivableJob
 
   #Is there a note associated with this job?
   def note?
-    return true unless options.note.blank?
+    return true unless Settings.note.blank?
     return false
   end
 
   def store_note
     return unless note?
-    note = options.note
+    note = Settings.note
     note_file = File.open(note_filename, 'w')
     note_file << note
     note_file.close
