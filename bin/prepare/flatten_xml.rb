@@ -8,6 +8,8 @@ require 'wukong'
 # Flattens the wikipedia 'enwiki-latest-pages-articles.xml.gz' into a
 # one-line-per-record heap.
 #
+#    bin/prepare/wikidump/flatten_xml.rb --rm --run /data/source/wikidata/wikidump/enwiki-latest-pages-articles.xml.gz /data/rawd/wikidump/articles.xml
+#
 
 class FlattenXml < Wukong::Streamer::LineStreamer
   START_OF_RECORD=%r{\A\s*<page>}
@@ -40,7 +42,7 @@ class FlattenXml < Wukong::Streamer::LineStreamer
       puts line
       self.in_record = false
     else
-      print line.chomp if self.in_record
+      print(line.chomp, '&#10;') if self.in_record
     end
   end
 end
