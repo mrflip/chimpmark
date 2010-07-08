@@ -8,9 +8,27 @@ require 'wukong'
 # Flattens the wikipedia 'enwiki-latest-pages-articles.xml.gz' into a
 # one-line-per-record heap.
 #
-#    bin/prepare/wikidump/flatten_xml.rb --rm --run /data/source/wikidata/wikidump/enwiki-latest-pages-articles.xml.gz /data/rawd/wikidump/articles.xml
+#    bin/prepare/wikidump/flatten_xml.rb --rm --run \
+#      /data/source/download.wikimedia.org/enwiki/20100622-expanded/enwiki-20100622-pages-articles.xml
+#      /data/rawd/wikidump/articles
 #
-
+# <page>
+#   <title>Anarchism</title>
+#   <id>12</id>
+#   <revision>
+#     <id>370845941</id>
+#     <timestamp>2010-06-29T20:14:56Z</timestamp>
+#     <contributor>
+#       <username>Centographer</username>
+#       <id>12640258</id>
+#     </contributor>
+#     <comment>clarifying not ordinary anarcho-socialism</comment>
+#     <text xml:space="preserve">
+#       ...snip ...
+#     </text>
+#   </revision>
+# </page>
+#
 class FlattenXml < Wukong::Streamer::LineStreamer
   START_OF_RECORD=%r{\A\s*<page>}
   END_OF_RECORD=%r{\A\s*</page>}
@@ -46,6 +64,7 @@ class FlattenXml < Wukong::Streamer::LineStreamer
     end
   end
 end
+
 
 # Execute the script
 Wukong::Script.new(

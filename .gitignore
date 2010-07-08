@@ -21,3 +21,4 @@ pkg
 .DS_Store
 .bak
 *DO_NOT_VERSION*
+pig_*.log
