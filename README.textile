@@ -38,7 +38,7 @@ h2. Ideas for Tasks:
 |_. Cat wrangling                                |                         |                                                    |
 |  sort on numeric field, 1k-char records        | wp traffic              | ORDER                                              |
 |  sort on numeric field, 6 numeric columns      | spreadsheet             | ORDER                                              |
-|  sort wp by page titles                        | wp traffic              | ORDER                                              |
+|  sort wp by page titles                        | long documents          | ORDER                                              |
 |  create inverted index                         | long documents          | tokenize, group                                    |
 |  word count (simple tokenization)              | long documents          | tokenize, group, count                             |
 |  word count (advanced tokenization)            | long documents          | complex code, group                                |

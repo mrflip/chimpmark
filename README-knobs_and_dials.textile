@@ -1,0 +1,24 @@
+
+
+Excessive Spill
+
+  io.sort.mb
+  io.sort.record.percent        if records are small and you see spill fiddle with this
+  io.sort.spill.percent
+
+
+Map-side compression
+
+  mapred.compress.map.output
+  mapred.map.output.compression.codec
+
+
+Reduce-side spil
+  fs.inmemory.size.mb           determines size of merge buffer allocated by the framework
+  io.sort.factor                number of segments to keep in memory before wriGng to disk
+
+
+References:
+
+* Hadoop Performance Tuning - Milind Bhandarkar, Suhas Gogate, Viraj Bhat
+
