@@ -10,7 +10,7 @@ Assumptions
 * The machine has no swap (or that if it does, we don't ever want to be using it)
 * The machines are fully dedicated to hadoop; there is no contention for memory or CPU with other processes.
 
-We'll discuss two different clusters:
+We'll discuss three different clusters:
 
 * The *balanced cluster*: this has to give reasonable performance on all types of tasks: memory-intensive, io-intensive, cpu-intensive.
 * The *map-heavy cluster*: runs CPU-bound tasks, many of which run with either zero reducers or very CPU-modest reducers (eg only a uniq pass on the reduce). Examples of this: parsing terabytes of HTML or log files, or pushing data throug a machine-learning or corpus-analysis 'black box'. These jobs imply very low memory demands, little worry about spill protection, and the need to maximize map-side CPU utilization.
