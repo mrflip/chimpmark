@@ -1,11 +1,86 @@
 
+Your goal is to have the
 
-Excessive Spill
+* your IO bus fully saturated, but without contention
+* the CPU needle pegged to 100% on all cores, but without task thrashing
+* RAM fully utilized, but without swapping
 
-  io.sort.mb
-  io.sort.record.percent        if records are small and you see spill fiddle with this
-  io.sort.spill.percent
+Assumptions
 
+* The machine has no swap (or that if it does, we don't ever want to be using it)
+* The machines are fully dedicated to hadoop; there is no contention for memory or CPU with other processes.
+
+We'll discuss two different clusters:
+
+* The *balanced cluster*: this has to give reasonable performance on all types of tasks: memory-intensive, io-intensive, cpu-intensive.
+* The *map-heavy cluster*: runs CPU-bound tasks, many of which run with either zero reducers or very CPU-modest reducers (eg only a uniq pass on the reduce). Examples of this: parsing terabytes of HTML or log files, or pushing data throug a machine-learning or corpus-analysis 'black box'. These jobs imply very low memory demands, little worry about spill protection, and the need to maximize map-side CPU utilization.
+
+h2. How many tasks?
+
+You should set the number of map and reduce tasks so that it fully utilizes the CPU:
+
+  mapred.tasktracker.map.tasks.maximum    := node_map_tasks
+  mapred.tasktracker.reduce.tasks.maximum := node_reduce_tasks
+  node_tasks = node_map_tasks + node_reduce_tasks
+  cluster_
+
+You want the number of running tasks to be the same as the number of cores.
+
+* For the map-heavy cluster, set node_map_tasks to the number of cores. Depending on your memory constraints, set the reducers as low as 1 or 2. You'll lose some performance if your mappers have all finished and only the reducers are running, but benefit from full utilization on the heavier map phase.
+
+* If you have very short tasks -- a few seconds, short enough that job setup time is significant, run slightly more 
+  mapred.job.reuse.jvm.num.tasks   := -1
+
+The total tasks' heap size should fit in ram:
+
+  node_tasks * 
+
+
+
+  
+
+The total sort buffers for all must fit in ram.
+
+  io.sort.mb * (node_tasks) < available_ram
+
+
+
+If this is 1 (the default), then JVMs are not reused (1 task per JVM). If it is -1, there is no limit to the number of tasks a JVM can run (of the same job). One can also specify some value greater than 1. Also a JobConf API has been added - setNumTasksToExecutePerJvm  
+
+h3. Minimize spills
+
+
+This is good:
+
+<pre>
+        2010-07-10 19:29:07,386 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
+        2010-07-10 19:29:07,906 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
+        2010-07-10 19:29:07,906 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
+        2010-07-10 19:30:02,565 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
+        2010-07-10 19:30:08,091 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
+        2010-07-10 19:30:08,093 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
+        2010-07-10 19:30:08,094 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
+        2010-07-10 19:30:43,144 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
+        2010-07-10 19:30:43,147 INFO org.apache.hadoop.mapred.TaskRunner: Task:attempt_201007101502_0006_m_000040_0 is done. And is in the process of commiting
+        2010-07-10 19:30:43,150 INFO org.apache.hadoop.mapred.TaskRunner: Task 'attempt_201007101502_0006_m_000040_0' done.
+</pre>
+
+You'd like to have only one spill per map task. Sez @tlipcon:
+
+bq. "You're unlikely to see a big difference in performance unless you cut down
+   the number of spills from >1 to 1, or >io.sort.factor to <io.sort.factor. The
+   difference between 3 spills and 5 spills is not huge, in my experience, since
+   you're still writing the same amount of data to disk."
+
+To get to the magic one-spill number, run your job for long enough that some mappers complete. In the jobtracker window, follow the link under map/complete in the top table, and visit the counters for a couple tasks. Estimate from there the average map output records and bytes.
+
+<pre>
+  avg_record_size        := avg_map_output_bytes / avg_map_output_records
+  io.sort.spill.percent  := 0.80 # by default; leave this alone
+  io.sort.record.percent  > 16 / (16 + avg_record_size)
+  io.sort.mb              > map_output_bytes / ((1 - io.sort.record.percent) * io.sort.spill.percent)
+</pre>
+  
 
 Map-side compression
 
@@ -18,7 +93,71 @@ Reduce-side spil
   io.sort.factor                number of segments to keep in memory before wriGng to disk
 
 
+  
+
 References:
 
 * Hadoop Performance Tuning - Milind Bhandarkar, Suhas Gogate, Viraj Bhat
 
+
+
+
+
+mapred.job.reuse.jvm.num.tasks
+
+
+Compression mapred.compress.map.output: Map Output Compression Default: False Pros: Faster disk writes, lower disk space usage, lesser time spent on data transfer (from mappers to reducers). Cons: Overhead in compression at Mappers and decompression at Reducers. Suggestions: For large cluster and large jobs this property should be set true. The compression codec can also be set through the property m​a​p​r​e​d​.​m​a​p​.​o​u​t​p​u​t​.​c​o​m​p​r​e​s​s​i​o​n​.​c​o​d​e​c (Default is o​r​g​.​a​p​a​c​h​e​.​h​a​d​o​o​p​.​i​o​.​c​o​m​p​r​e​s​s​.​D​e​f​a​u​l​ t​C​o​d​e​c​)​. 4
+Slide 5
+
+Speculative Execution m​a​p​r​e​d​.​m​a​p​/​r​e​d​u​c​e​.​t​a​s​k​s​.​s​p​e​c​u​l​a​t​i​v​e​.​ e​x​e​c​u​t​i​o​n​: Enable/Disable task (map/reduce) speculative Execution Default: True Pros: Reduces the job time if the task progress is slow due to memory unavailability or hardware degradation. Cons: Increases the job time if the task progress is slow due to complex and large calculations. On a busy cluster speculative execution can reduce overall throughput, since redundant tasks are being executed in an attempt to bring down the execution time for a single job. Suggestions: In large jobs where average task completion time is significant (> 1 hr) due to complex and large calculations and high throughput is required the speculative execution should be set to false. 5
+Slide 6
+
+Number of Maps/Reducers m​a​p​r​e​d​.​t​a​s​k​t​r​a​c​k​e​r​.​m​a​p​/​r​e​d​u​c​e​.​t​a​s​k​s​.​ m​a​x​i​m​u​m​: Maximum tasks (map/reduce) for a tasktracker Default: 2 Suggestions: Recommended range - (cores_per_node)/2 to 2x(cores_per_node), especially for large clusters. This value should be set according to the hardware specification of cluster nodes and resource requirements of tasks (map/reduce). 6
+Slide 7
+
+File block size dfs.block.size: File system block size Default: 67108864 (bytes) Suggestions: Small cluster and large data set: default block size will create a large number of map tasks. e.g. Input data size = 160 GB and dfs.block.size = 64 MB then the minimum no. of maps= (160*1024)/64 = 2560 maps. If dfs.block.size = 128 MB minimum no. of maps= (160*1024)/128 = 1280 maps. If dfs.block.size = 256 MB minimum no. of maps= (160*1024)/256 = 640 maps.  In a small cluster (6-10 nodes) the map task creation overhead is considerable. So dfs.block.size should be large in this case but small enough to utilize all the cluster resources.  The block size should be set according to size of the cluster, map task complexity, map task capacity of cluster and average size of input files. 7
+Slide 8
+
+Sort size io.sort.mb: Buffer size (MBs) for sorting Default: 100 Suggestions: For Large jobs (the jobs in which map output is very large), this value should be increased keeping in mind that it will increase the memory required by each map task. So the increment in this value should be according to the available memory at the node. Greater the value of io.sort.mb, lesser will be the spills to the disk, saving write to the disk. 8
+Slide 9
+
+Sort factor io.sort.factor: Stream merge factor Default: 10 Suggestions: For Large jobs (the jobs in which map output is very large and number of maps are also large) which have large number of spills to disk, value of this property should be increased. The number of input streams (files) to be merged at once in the map/reduce tasks, as specified by io.sort.factor, should be set to a sufficiently large value (for example, 100) to minimize disk accesses. Increment in io.sort.factor, benefits in merging at reducers since the last batch of streams (equal to io.sort.factor) are sent to the reduce function without merging, thus saving time in merging. 9
+Slide 10
+
+JVM reuse : Reuse single JVM Default: 1 Suggestions: The minimum overhead of JVM creation for each task is around 1 second. So for the tasks which live for seconds or a few minutes and have lengthy initialization, this value can be increased to gain performance. 10
+Slide 11
+
+Reduce parallel copies m​a​p​r​e​d​.​r​e​d​u​c​e​.​p​a​r​a​l​l​e​l​.​c​o​p​i​e​s​: Threads for parallel copy at reducer Default: 5 Description: The number of threads used to copy map outputs to the reducer. Suggestions: For Large jobs (the jobs in which map output is very large), value of this property can be increased keeping in mind that it will increase the total CPU usage. 11
+Slide 12
+
+The Other Threads d​f​s​.​n​a​m​e​n​o​d​e​{​/​m​a​p​r​e​d​.​j​o​b​.​t​r​a​c​k​e​r​}​.​h​a​ n​d​l​e​r​.​c​o​u​n​t :server threads that handle remote procedure calls (RPCs) Default: 10 Suggestions: This can be increased for larger server (50-64). dfs.datanode.handler.count :server threads that handle remote procedure calls (RPCs) Default: 3 Suggestions: This can be increased for larger number of HDFS clients (6-8). tasktracker.http.threads : number of worker threads on the HTTP server on each TaskTracker Default: 40 Suggestions: The can be increased for larger clusters (50). 12
+Slide 13
+
+Other hotspots
+Slide 14
+
+Revelation-Temporary space Temporary space allocation: Jobs which generate large intermediate data (map output) should have enough temporary space controlled by property mapred.local.dir. This property specifies list directories where the MapReduce stores intermediate data for jobs. The data is cleaned-up after the job completes. By default, replication factor for file storage on HDFS is 3, which means that every file has three replicas. As a rule of thumb, at least 25% of the total hard disk should be allocated for intermediate temporary output. So effectively, only ¼ hard disk space is available for business use. The default value for mapred.local.dir is $​{​h​a​d​o​o​p​.​t​m​p​.​d​i​r​}​/​m​a​p​r​e​d​/​l​o​c​a​l​. So if mapred.local.dir is not set, hadoop.tmp.dir must have enough space to hold job’s intermediate data. If the node doesn’t have enough temporary space the task attempt will fail and starts a new attempt, thus impacting the performance. 14
+Slide 15
+
+Java- JVM JVM tuning: Besides normal java code optimizations, JVM settings for each child task also affects the processing time. On slave node end, the task tracker and data node use 1 GB RAM each. Effective use of the remaining RAM as well as choosing the right GC mechanism for each Map or Reduce task is very important for maximum utilization of hardware resources. The default max RAM for child tasks is 200MB which might be insufficient for many production grade jobs. The JVM settings for child tasks are governed by mapred.child.java.opts property. Use JDK 1.6 64 BIT– + +XX:CompressedOops helpful in dealing with OOM errors Do remember changing Linux open file descriptor Set java.net.preferIPv4Stack set to true, to avoid timeouts in cases where the OS/JVM picks up an IPv6 address and must resolve the hostname. 15
+Slide 16
+
+Logging Is a friend to developers, Foe in production Default - INFO level dfs.namenode.logging.level hadoop.job.history hadoop.logfile.size/count 16
+Slide 17
+
+Static Data strategies Available Approaches JobConf.set(“key”,”value”) Distributed cache HDFS shared file Suggested approaches if above ones not efficient Memcached Tokyocabinet/TokyoTyrant Berkley DB HBase 17
+Slide 18
+
+Debugging and profiling- Arun C Murthy Hadoop Map-Reduce – Tuning and Debugging- from Arun C Murthy presentation Debugging Log files/UI view Local runner Single machine mode Set keep.failed.task.files to true and use the IsolationRunner Profiling Set mapred.task.profile to true Use m​a​p​r​e​d​.​t​a​s​k​.​p​r​o​f​i​l​e​.​{​m​a​p​s​|​r​e​d​u​c​e​s​} hprof support is built-in Use mapred.task.profile.params to set options for the debugger Possibly DistributedCache for the profiler’s agent 18
+Slide 19
+
+Tuning - Arun C Murthy Hadoop Map-Reduce – Tuning and Debugging- from Arun C Murthy presentation Tuning Tell HDFS and Map-Reduce about your network! – Rack locality script: topology.script.file.name Number of maps – Data locality Number of reduces – You don’t need a single output file!Log files/UI view Amount of data processed per Map - Consider fatter maps, Custom input format Combiner - multi-level combiners at both Map and Reduce Check to ensure the combiner is useful! Map-side sort -io.sort.mb, io.sort.factor, io.sort.record.percent, io.sort.spill.percent Shuffle Compression for map-outputs – mapred.compress.map.output , m​a​p​r​e​d​.​m​a​p​.​o​u​t​p​u​t​.​c​o​m​p​r​e​s​s​i​o​n​.​c​o​d​e​c , lzo via libhadoop.so, tasktracker.http.threads m​a​p​r​e​d​.​r​e​d​u​c​e​.​p​a​r​a​l​l​e​l​.​c​o​p​i​e​s​, mapred.reduce.copy.backoff, m​a​p​r​e​d​.​j​o​b​.​s​h​u​f​f​l​e​.​i​n​p​u​t​.​b​u​f​f​e​r​.​p​e​r​c​ e​n​t​, m​a​p​r​e​d​.​j​o​b​.​s​h​u​f​f​l​e​.​m​e​r​g​e​.​p​e​r​c​e​n​t​, mapred.inmem.merge.threshold, m​a​p​r​e​d​.​j​o​b​.​r​e​d​u​c​e​.​i​n​p​u​t​.​b​u​f​f​e​r​.​p​e​r​c​e​ n​t Compress the job output Miscellaneous -Speculative execution, Heap size for the child, Re-use jvm for maps/reduces, Raw Comparators 19
+Slide 20
+
+Next steps Hadoop Vaidya (since 0.20.0) Job configuration analyzer (WIP-to be contributed back to Hadoop) Part of Analyze Job web ui Analyze and suggest config parameters from job.xml Smart suggestion engine/auto-correction 20
+Slide 21
+
+Conclusion Performance of Hadoop MapReduce jobs can be improved without increasing the hardware costs, by tuning several key configuration parameters for cluster specifications, input data size and processing complexity. 21
+Slide 22
+
+References Hadoop.apache.org Hadoop-performance tuning--white paper v1 1.pdf – Arun C Murthy I​n​t​e​l​_​W​h​i​t​e​_​P​a​p​e​r​_​O​p​t​i​m​i​z​i​n​g​_​H​a​d​o​o​p​_​ D​e​p​l​o​y​m​e​n​t​s​.​p​d​f 22 
