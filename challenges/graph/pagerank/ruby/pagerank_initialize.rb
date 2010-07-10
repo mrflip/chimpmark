@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
-$: << File.dirname(__FILE__)+'/../../lib'
 require 'wukong'
-require 'wukong/streamer/set_reducer'
 
 module PageRank
   class Script < Wukong::Script
@@ -27,8 +25,9 @@ module PageRank
   # edge's multiplicity.
   #
   class Reducer < Wukong::Streamer::ListReducer
-    def accumulate src, dest
-      self.values << dest
+    def accumulate *args
+      return unless args.length >= 2
+      self.values << args[1]
     end
 
     # Emit src, initial pagerank, and flattened dests list
