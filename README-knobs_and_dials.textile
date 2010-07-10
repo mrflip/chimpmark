@@ -14,8 +14,11 @@ We'll discuss two different clusters:
 
 * The *balanced cluster*: this has to give reasonable performance on all types of tasks: memory-intensive, io-intensive, cpu-intensive.
 * The *map-heavy cluster*: runs CPU-bound tasks, many of which run with either zero reducers or very CPU-modest reducers (eg only a uniq pass on the reduce). Examples of this: parsing terabytes of HTML or log files, or pushing data throug a machine-learning or corpus-analysis 'black box'. These jobs imply very low memory demands, little worry about spill protection, and the need to maximize map-side CPU utilization.
+* The *reduce-bound cluster*: severe memory constraints on the reduce side, and minimal CPU load all around.  This cluster needs to optimize sort and shuffle, pay close attention to IO and maximize efficient use of memory, especially on the reduce side.
 
 h2. How many tasks?
+
+h3. How to set defaults
 
 You should set the number of map and reduce tasks so that it fully utilizes the CPU:
 
@@ -28,8 +31,17 @@ You want the number of running tasks to be the same as the number of cores.
 
 * For the map-heavy cluster, set node_map_tasks to the number of cores. Depending on your memory constraints, set the reducers as low as 1 or 2. You'll lose some performance if your mappers have all finished and only the reducers are running, but benefit from full utilization on the heavier map phase.
 
-* If you have very short tasks -- a few seconds, short enough that job setup time is significant, run slightly more 
-  mapred.job.reuse.jvm.num.tasks   := -1
+* For the reduce-bound cluster, let the memory constraints govern the number of tasks.
+
+* If you have very short tasks -- a few seconds, short enough that job setup time is significant -- run slightly more mappers than you would otherwise. (My un-measured guess is one extra mapper + another per 8 cores). Also, set @mapred.job.reuse.jvm.num.tasks := -1@.
+
+* If you are running in a streaming context, you might run either fewer or more tasks per node! Basically, start with the defaults and follow the tuning instructions below.
+
+h3. How to tune
+
+
+
+h2. How much memory
 
 The total tasks' heap size should fit in ram:
 
