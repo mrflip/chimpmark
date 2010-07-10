@@ -7,12 +7,13 @@ require 'configliere/commandline'
 require 'fileutils'
 
 Settings.define :archive_dir, :default => File.expand_path("~/timings"), :description => 'Where to store the archived job output'
+Settings.define :note, :default => "", :description => 'Where to store the archived job output'
 Settings.resolve!
 
 #
 # FIXME: add these fields: started at, num_tasks, reduce_input_groups
 #
-NAMENODE_URL = "http://chef.howeville.com"
+NAMENODE_URL = "http://gibbon.infinitemonkeys.info"
 
 class JobDetails < TypedStruct.new(
     [:job_id,                String],
@@ -136,7 +137,10 @@ class ArchivableJob
   def jobconf_filename
     File.join(archive_path, "jobconf-#{slug}.xml")
   end
-
+  def note_filename
+    File.join(archive_path, "note-#{slug}.txt")
+  end
+  
   # Where to find the jobdetails HTML page (the one that is parsed)
   def jobdetails_url
     NAMENODE_URL + ":50030" + "/jobdetails.jsp?jobid=" + job_id
@@ -146,12 +150,27 @@ class ArchivableJob
     NAMENODE_URL + ":50030" + "/jobconf.jsp?jobid=" + job_id
   end
 
+  #Is there a note associated with this job?
+  def note?
+    return true unless Settings.note.blank?
+    return false
+  end
+
+  def store_note
+    return unless note?
+    note = Settings.note
+    note_file = File.open(note_filename, 'w')
+    note_file << note
+    note_file.close
+  end
+  
   #
   # Use curl to fetch the jobdetails page
   #
   def archive!
     FileUtils.mkdir_p(File.dirname(jobdetails_filename))
     FileUtils.mkdir_p(File.dirname(jobconf_filename))
+    store_note
     $stderr.print %x{curl -s #{jobdetails_url} -o #{jobdetails_filename}}
     $stderr.print %x{curl -s #{jobconf_url}    -o #{jobconf_filename}}
   end
