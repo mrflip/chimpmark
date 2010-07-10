@@ -29,37 +29,50 @@ You should set the number of map and reduce tasks so that it fully utilizes the 
 
 You want the number of running tasks to be the same as the number of cores.
 
-* For the map-heavy cluster, set node_map_tasks to the number of cores. Depending on your memory constraints, set the reducers as low as 1 or 2. You'll lose some performance if your mappers have all finished and only the reducers are running, but benefit from full utilization on the heavier map phase.
+* For the _map-heavy cluster_, set node_map_tasks to the number of cores. Depending on your memory constraints, set the reducers as low as 1 or 2. You'll lose some performance if your mappers have all finished and only the reducers are running, but benefit from full utilization on the heavier map phase.
 
-* For the reduce-bound cluster, let the memory constraints govern the number of tasks.
+* For the _reduce-bound cluster_, let the memory constraints govern the number of tasks.
 
-* If you have very short tasks -- a few seconds, short enough that job setup time is significant -- run slightly more mappers than you would otherwise. (My un-measured guess is one extra mapper + another per 8 cores). Also, set @mapred.job.reuse.jvm.num.tasks := -1@.
+* If you have very short tasks -- a few seconds, short enough that job setup time is significant -- run slightly more mappers than you would otherwise. (My un-measured guess is one extra mapper + another per 8 cores).
+** Also consider setting @mapred.job.reuse.jvm.num.tasks := -1@. If this is 1 (the default), then JVMs are not reused (1 task per JVM). If it is -1, there is no limit to the number of tasks a JVM can run (of the same job). One can also specify some value greater than 1.
 
-* If you are running in a streaming context, you might run either fewer or more tasks per node! Basically, start with the defaults and follow the tuning instructions below.
+* If you are running in a streaming context, you might want to run either fewer or more tasks per node! Start with the defaults and follow tuning instructions below.
 
-h3. How to tune
+h3. Tuning checks
 
+A definition: _Active worker_ means either the task workers or (if streaming) its child process -- that is, not the tasktracker or the datanode, and not any other job on the machine
 
+* Visit one or two random nodes and launch @htop@. Follow its progress through the whole job.
+** Only active workers should consume more than a few percent of CPU. 
+** You'd like to see the CPU meter pegged at 100% on all cores. This means there are enough tasks running.
+** Each active worker should be trying to use 100% of its core. On the _map-heavy cluster_, active workers should be sitting at 60-100% of CPU. On the _balanced cluster_, 40% or more is OK. On the _reduce-bound cluster_, we don't care too much. If your typical situation is something like '10 active workers on two cores, each using 18%', consider lowering the number of total tasks.
 
 h2. How much memory
 
-The total tasks' heap size should fit in ram:
+h3. Parameters in question
 
-  node_tasks * 
-
-
-
-  
-
-The total sort buffers for all must fit in ram.
-
-  io.sort.mb * (node_tasks) < available_ram
+* @java_heap_size@: the @-Xmx=XXXm@ parameter in @mapred.child.java.opts@. Memory cap for the worker java processes
+* @mapred.child.ulimit@: max memory for the worker process and all child processes (for instance, streaming workers)
+* @node_tasks@: may need to be reduced 
 
 
+In practice, we just use the the total tasks' heap size  to :
 
-If this is 1 (the default), then JVMs are not reused (1 task per JVM). If it is -1, there is no limit to the number of tasks a JVM can run (of the same job). One can also specify some value greater than 1. Also a JobConf API has been added - setNumTasksToExecutePerJvm  
+<pre>
+  node_tasks * java_heap_size =~ 0.9 * available ram
+</pre>
 
-h3. Minimize spills
+You *must* set mapred.child.ulimit greater than java_heap_size. This defends against a runaway child task eating all your ram -- set it at 2 to 4 times 
+
+
+The total sort buffers for all must fit in heap with room to spare. 
+
+<pre>
+  io.sort.mb < mapred.child.java.opts
+</pre>
+
+
+h3. Minimize map-side spills
 
 
 This is good:
@@ -77,6 +90,37 @@ This is good:
         2010-07-10 19:30:43,150 INFO org.apache.hadoop.mapred.TaskRunner: Task 'attempt_201007101502_0006_m_000040_0' done.
 </pre>
 
+This is bad:
+
+<pre>
+2010-07-10 20:37:31,355 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
+2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
+2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
+2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
+2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: bufstart = 0; bufend = 100992858; bufvoid = 205520896
+2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: kvstart = 0; kvend = 4404019; length = 5505024
+2010-07-10 20:38:48,302 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
+2010-07-10 20:38:48,303 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
+2010-07-10 20:38:48,304 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
+2010-07-10 20:39:13,523 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
+2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
+2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: bufstart = 100992858; bufend = 201882339; bufvoid = 205520896
+2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: kvstart = 4404019; kvend = 3303013; length = 5505024
+2010-07-10 20:40:39,941 INFO org.apache.hadoop.mapred.MapTask: Finished spill 1
+2010-07-10 20:41:03,286 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
+2010-07-10 20:41:33,125 INFO org.apache.hadoop.mapred.MapTask: Finished spill 2
+2010-07-10 20:41:33,354 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+2010-07-10 20:41:33,359 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+2010-07-10 20:41:33,361 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+2010-07-10 20:41:33,362 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+2010-07-10 20:41:33,362 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 925614 bytes
+2010-07-10 20:41:34,832 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+2010-07-10 20:41:34,835 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 857190 bytes
+2010-07-10 20:41:36,085 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+2010-07-10 20:41:36,087 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 902202 bytes
+... another 100+ seconds in merge ...
+</pre>
+
 You'd like to have only one spill per map task. Sez @tlipcon:
 
 bq. "You're unlikely to see a big difference in performance unless you cut down
@@ -92,30 +136,28 @@ To get to the magic one-spill number, run your job for long enough that some map
   io.sort.record.percent  > 16 / (16 + avg_record_size)
   io.sort.mb              > map_output_bytes / ((1 - io.sort.record.percent) * io.sort.spill.percent)
 </pre>
-  
 
-Map-side compression
+
+
+h3. Reduce-side spills
+
+  fs.inmemory.size.mb           determines size of merge buffer allocated by the framework
+  io.sort.factor                number of segments to keep in memory before writing to disk
+
+
+h2. IO optimization
+
+
+h3. Map-side compression
 
   mapred.compress.map.output
   mapred.map.output.compression.codec
 
 
-Reduce-side spil
-  fs.inmemory.size.mb           determines size of merge buffer allocated by the framework
-  io.sort.factor                number of segments to keep in memory before wriGng to disk
-
-
-  
-
-References:
+h2. References:
 
 * Hadoop Performance Tuning - Milind Bhandarkar, Suhas Gogate, Viraj Bhat
 
-
-
-
-
-mapred.job.reuse.jvm.num.tasks
 
 
 Compression mapred.compress.map.output: Map Output Compression Default: False Pros: Faster disk writes, lower disk space usage, lesser time spent on data transfer (from mappers to reducers). Cons: Overhead in compression at Mappers and decompression at Reducers. Suggestions: For large cluster and large jobs this property should be set true. The compression codec can also be set through the property m​a​p​r​e​d​.​m​a​p​.​o​u​t​p​u​t​.​c​o​m​p​r​e​s​s​i​o​n​.​c​o​d​e​c (Default is o​r​g​.​a​p​a​c​h​e​.​h​a​d​o​o​p​.​i​o​.​c​o​m​p​r​e​s​s​.​D​e​f​a​u​l​ t​C​o​d​e​c​)​. 4
