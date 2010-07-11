@@ -1,0 +1,21 @@
+
+-- users        = FOREACH network GENERATE user_a;
+-- edges        = FOREACH network GENERATE user_a, FLATTEN(out_links) AS user_b;
+-- 
+-- subg_edges_0 = JOIN users by user_a, edges BY user_b;
+-- subg_edges   = FOREACH subg_edges_0 GENERATE edges::user_a, edges::user_b;
+-- 
+-- -- rmf                     /tmp/sub_graph
+-- -- STORE  subg_edges INTO '/tmp/sub_graph';
+-- 
+-- subg_edges   = LOAD '/tmp/sub_graph' AS (user_a:long, user_b:long);
+-- subg_adjl_0  = GROUP subg_edges BY user_a;
+-- subg_adjl    = FOREACH subg_adjl_0 GENERATE
+--   group AS user_a,
+--   1.0f AS rank:float,
+--   (int)COUNT(subg_edges) AS num_out_links:int,
+--   subg_edges.user_b AS out_links;
+-- 
+-- rmf                     /tmp/sub_graph_pr_000
+-- STORE  subg_adjl INTO '/tmp/sub_graph_pr_000';
+  
