@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-export PIG_OPTS="-Dio.sort.record.percent=0.42 -Dio.sort.mb=620 -Dio.sort.factor=61 -Dmapred.child.java.opts=-Xmx1900m"
+# Run this with 2 mappers and 1 reducer on m1.large
+export PIG_OPTS='-Dio.sort.record.percent=0.43 -Dio.sort.mb=520 -Dio.sort.factor=52 -Dio.sort.spill.percent=0.88 -Dmapred.job.reuse.jvm.num.tasks=1'
 
 # Directory to pagerank on.
 work_dir=$1     ; shift

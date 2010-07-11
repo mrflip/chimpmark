@@ -274,7 +274,7 @@ class ArchivableJob
     ArchivableJob.fetch_url(jobdetails_url, jobdetails_filename)
     ArchivableJob.fetch_url(jobconf_url,    jobconf_filename)
     details = parse()
-    tasks = JobTasks.new(slug, [details.map_tasks, 450].min, [details.reduce_tasks,0].min)
+    tasks = JobTasks.new(slug, [details.map_tasks].min, [details.reduce_tasks].min)
     tasks.fetch_task_counters
   end
 
