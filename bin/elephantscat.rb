@@ -116,8 +116,8 @@ class JobDetailsParser
     details.finished     = top_table["Status"].to_s.downcase == "failed" ? 0 : 1
     details.started_at   = top_table["Started at" ]
     details.finished_at  = top_table["Finished at"]
-    details.map_tasks    = num_table[0][-6].to_i
-    details.reduce_tasks = num_table[1][-6].to_i
+    details.map_tasks    = num_table[0][-6].to_i rescue nil
+    details.reduce_tasks = num_table[1][-6].to_i rescue nil
 
     yield  details if block
     return details
@@ -274,7 +274,7 @@ class ArchivableJob
     ArchivableJob.fetch_url(jobdetails_url, jobdetails_filename)
     ArchivableJob.fetch_url(jobconf_url,    jobconf_filename)
     details = parse()
-    tasks = JobTasks.new(slug, [details.map_tasks].min, [details.reduce_tasks].min)
+    tasks = JobTasks.new(slug, [details.map_tasks.to_i].min, [details.reduce_tasks.to_i].min)
     tasks.fetch_task_counters
   end
 
