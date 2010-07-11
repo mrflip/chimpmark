@@ -38,6 +38,9 @@ You want the number of running tasks to be the same as the number of cores.
 
 * If you are running in a streaming context, you might want to run either fewer or more tasks per node! Start with the defaults and follow tuning instructions below.
 
+
+* Swapping and Java VM options: http://www.mail-archive.com/common-user@hadoop.apache.org/msg05462.html
+
 h3. Tuning checks
 
 A definition: _Active worker_ means either the task workers or (if streaming) its child process -- that is, not the tasktracker or the datanode, and not any other job on the machine
@@ -47,14 +50,94 @@ A definition: _Active worker_ means either the task workers or (if streaming) it
 ** You'd like to see the CPU meter pegged at 100% on all cores. This means there are enough tasks running.
 ** Each active worker should be trying to use 100% of its core. On the _map-heavy cluster_, active workers should be sitting at 60-100% of CPU. On the _balanced cluster_, 40% or more is OK. On the _reduce-bound cluster_, we don't care too much. If your typical situation is something like '10 active workers on two cores, each using 18%', consider lowering the number of total tasks.
 
+* watch the logs -- anything funny crop up?
+
+* how much time is spent in the reducer -- both from the point the last mapper completes, and from the point in each reducer that its copy completes? If this is short relative to everything else, you can afford fewer reducers than cores.
+
+
 h2. How much memory
 
 h3. Parameters in question
 
 * @java_heap_size@: the @-Xmx=XXXm@ parameter in @mapred.child.java.opts@. Memory cap for the worker java processes
-* @mapred.child.ulimit@: max memory for the worker process and all child processes (for instance, streaming workers)
+* @mapred.child.ulimit@: max memory for the worker process and all child processes (for instance, streaming workers).
 * @node_tasks@: may need to be reduced 
 
+* @HADOOP_HEAPSIZE@ in hadoop_env.sh
+
+You can count on your input being one block big in general:
+
+<pre>
+  dfs.block.size    := 134217728    # 128M
+  fs.s3.block.size  :=  67108864
+  avg_map_input_mb   = 128
+</pre>
+
+* a smaller block size will lead to more map tasks per job
+* a larger block size will lead to early spill and more map-side memory pressure
+
+mapred.job.reduce.input.buffer.percent
+mapred.job.shuffle.input.buffer.percent
+mapred.job.shuffle.merge.percent
+mapred.job.reduce.markreset.buffer.percent
+mapred.inmem.merge.threshold                    1000
+
+
+* mapred.reduce.parallel.copies -- Reducer threads for copying from mapper.  Unclear when this should be increased -- should it be ~ equal to number of map_tasks?
+
+* mapred.job.tracker.handler.count              10  -- The number of server threads for the JobTracker. 
+* dfs.namenode.handler.count                    10  -- rec 64
+* dfs.datanode.handler.count                     3  -- set this to about 1.5*node_tasks (assuming 1 datanode per node_tasks workers, this should establish a good equilibrium number of handlers)
+* tasktracker.http.threads                      66  -- rec 40
+
+* mapred.local.dir -- a _local_ path. point it to a fast local drive, preferably several
+* hadoop.tmp.dir -- a _local_ path. point it to a fast local drive.
+
+mapred.reduce.copy.backoff                      300
+
+mapred.merge.recordsBeforeProgress              10000
+
+mapred.output.compress
+io.seqfile.sorter.recordlimit           1000000
+io.seqfile.compress.blocksize           1000000
+
+mapred.max.reduces.per.node                     -1
+mapred.jobtracker.maxtasks.per.job              -1
+mapred.max.maps.per.node                        -1
+mapred.tasktracker.reduce.tasks.maximum         1
+mapred.tasktracker.map.tasks.maximum            2
+io.mapfile.bloom.size
+io.mapfile.bloom.error.rate
+io.file.buffer.size                             65536    -- a solid default
+local.cache.size                           10_737_418_240
+pig.spill.size.threshold                        5 000 000
+pig.spill.gc.activation.size                   40 000 000
+topology.script.number.args
+
+raw comparators
+
+mapred.task.profile
+mapred.task.profile.params
+
+# -XX:+UseCompressedOops -XX:MaxNewSize=200m -XX:+UseParallelGC -XX:ParallelGCThreads=2
+# -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode
+# -server -XX:+AggressiveOpts 
+# export HADOOP_OPTS=-server 
+
+#                     -XX:+UseParallelGC -XX:ParallelGCThreads=2 -XX:MaxNewSize=200m
+# -XX:SurvivorRatio=8 -XX:+UseParallelGC -XX:ParallelGCThreads=20 -XX:+UseParallelOldGC
+# Use NUMA if available (-XX:+UseNUMA)
+# and -XX:+UseTLAB
+
+* JVM to use -XX:+UseLargePages needs to set kernel options too: http://andrigoss.blogspot.com/2008/02/jvm-performance-tuning.html
+* 
+* Java GC tuning: http://java.sun.com/javase/technologies/hotspot/gc/gc_tuning_6.html#icms
+** -XX:+UseConcMarkSweepGC -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError -Xloggc:/var/log/hadoop/gc-hadoop.log
+** Scott Carey: "I have found some notes that suggest that -XX:-ReduceInitialCardMarks will 
+work around some known crash problems with 6u18, but that may be unrelated."
+
+file descriptor ulimit
+java.net.preferIPv4Stack=true
 
 In practice, we just use the the total tasks' heap size  to :
 
@@ -62,7 +145,7 @@ In practice, we just use the the total tasks' heap size  to :
   node_tasks * java_heap_size =~ 0.9 * available ram
 </pre>
 
-You *must* set mapred.child.ulimit greater than java_heap_size. This defends against a runaway child task eating all your ram -- set it at 2 to 4 times 
+This mapred.child.ulimit  defends against a runaway child task eating all your ram. It must be *greater than* java_heap_size. Set it at 2 to 3 times the java_heap_size -- give yourself some breathing room, as you can adjust the mapred.java.child.opts per-job but not the mapred.child.ulimit limit.
 
 
 The total sort buffers for all must fit in heap with room to spare. 
@@ -71,6 +154,11 @@ The total sort buffers for all must fit in heap with room to spare.
   io.sort.mb < mapred.child.java.opts
 </pre>
 
+<pre>
+  echo 1   > /proc/sys/vm/overcommit_memory
+  echo 100 > /proc/sys/vm/overcommit_ratio
+</pre>
+  
 
 h3. Minimize map-side spills
 
@@ -93,32 +181,32 @@ This is good:
 This is bad:
 
 <pre>
-2010-07-10 20:37:31,355 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
-2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
-2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
-2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
-2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: bufstart = 0; bufend = 100992858; bufvoid = 205520896
-2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: kvstart = 0; kvend = 4404019; length = 5505024
-2010-07-10 20:38:48,302 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
-2010-07-10 20:38:48,303 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
-2010-07-10 20:38:48,304 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
-2010-07-10 20:39:13,523 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
-2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
-2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: bufstart = 100992858; bufend = 201882339; bufvoid = 205520896
-2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: kvstart = 4404019; kvend = 3303013; length = 5505024
-2010-07-10 20:40:39,941 INFO org.apache.hadoop.mapred.MapTask: Finished spill 1
-2010-07-10 20:41:03,286 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
-2010-07-10 20:41:33,125 INFO org.apache.hadoop.mapred.MapTask: Finished spill 2
-2010-07-10 20:41:33,354 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
-2010-07-10 20:41:33,359 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
-2010-07-10 20:41:33,361 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
-2010-07-10 20:41:33,362 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
-2010-07-10 20:41:33,362 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 925614 bytes
-2010-07-10 20:41:34,832 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
-2010-07-10 20:41:34,835 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 857190 bytes
-2010-07-10 20:41:36,085 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
-2010-07-10 20:41:36,087 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 902202 bytes
-... another 100+ seconds in merge ...
+        2010-07-10 20:37:31,355 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
+        2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
+        2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
+        2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
+        2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: bufstart = 0; bufend = 100992858; bufvoid = 205520896
+        2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: kvstart = 0; kvend = 4404019; length = 5505024
+        2010-07-10 20:38:48,302 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
+        2010-07-10 20:38:48,303 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
+        2010-07-10 20:38:48,304 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
+        2010-07-10 20:39:13,523 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
+        2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
+        2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: bufstart = 100992858; bufend = 201882339; bufvoid = 205520896
+        2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: kvstart = 4404019; kvend = 3303013; length = 5505024
+        2010-07-10 20:40:39,941 INFO org.apache.hadoop.mapred.MapTask: Finished spill 1
+        2010-07-10 20:41:03,286 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
+        2010-07-10 20:41:33,125 INFO org.apache.hadoop.mapred.MapTask: Finished spill 2
+        2010-07-10 20:41:33,354 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+        2010-07-10 20:41:33,359 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+        2010-07-10 20:41:33,361 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+        2010-07-10 20:41:33,362 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+        2010-07-10 20:41:33,362 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 925614 bytes
+        2010-07-10 20:41:34,832 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+        2010-07-10 20:41:34,835 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 857190 bytes
+        2010-07-10 20:41:36,085 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+        2010-07-10 20:41:36,087 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 902202 bytes
+        ... another 100+ seconds in merge ...
 </pre>
 
 You'd like to have only one spill per map task. Sez @tlipcon:
@@ -137,6 +225,23 @@ To get to the magic one-spill number, run your job for long enough that some map
   io.sort.mb              > map_output_bytes / ((1 - io.sort.record.percent) * io.sort.spill.percent)
 </pre>
 
+* "Increasing io.sort.factor benefits reduce -- the last batch of streams (equal to io.sort.factor) are sent to the reduce function without merging" [2]
+* Is there some benefit to having io.sort.factor > num nodes?
+
+<pre>
+  def calc_io_sort_options map_output_bytes, map_output_recs
+    io_sort_record_percent = 16 / (16 + (map_output_bytes.to_f / map_output_recs.to_f))
+    # edge it up a little, and round
+    io_sort_record_percent = (105 * io_sort_record_percent).round / 100.0
+    io_sort_spill_percent  = 0.80
+    io_sort_mb             = map_output_bytes / (io_sort_spill_percent * (1 - io_sort_record_percent))
+    { :io_sort_record_percent => io_sort_record_percent
+      :io_sort_mb             => io_sort_mb
+      :io_sort_factor         => io_sort_mb / 10.0
+      :io_sort_spill_percent  => io_sort_spill_percent
+    }
+  end
+</pre>
 
 
 h3. Reduce-side spills
@@ -150,68 +255,30 @@ h2. IO optimization
 
 h3. Map-side compression
 
-  mapred.compress.map.output
+  mapred.compress.map.output	        true
+  mapred.output.compress	        false
   mapred.map.output.compression.codec
+  mapred.output.compression.codec	org.apache.hadoop.io.compress.DefaultCodec
+  mapred.output.compression.type	BLOCK
+  
 
+h2. Avoiding Master process bottlenecks
+
+
+tasktracker.http.threads
+
+mapred.reduce.slowstart.completed.maps
+mapred.map.tasks.speculative.execution  true
+
+
+h2. Other tuning
+
+????
 
 h2. References:
 
-* Hadoop Performance Tuning - Milind Bhandarkar, Suhas Gogate, Viraj Bhat
-
-
-
-Compression mapred.compress.map.output: Map Output Compression Default: False Pros: Faster disk writes, lower disk space usage, lesser time spent on data transfer (from mappers to reducers). Cons: Overhead in compression at Mappers and decompression at Reducers. Suggestions: For large cluster and large jobs this property should be set true. The compression codec can also be set through the property m​a​p​r​e​d​.​m​a​p​.​o​u​t​p​u​t​.​c​o​m​p​r​e​s​s​i​o​n​.​c​o​d​e​c (Default is o​r​g​.​a​p​a​c​h​e​.​h​a​d​o​o​p​.​i​o​.​c​o​m​p​r​e​s​s​.​D​e​f​a​u​l​ t​C​o​d​e​c​)​. 4
-Slide 5
-
-Speculative Execution m​a​p​r​e​d​.​m​a​p​/​r​e​d​u​c​e​.​t​a​s​k​s​.​s​p​e​c​u​l​a​t​i​v​e​.​ e​x​e​c​u​t​i​o​n​: Enable/Disable task (map/reduce) speculative Execution Default: True Pros: Reduces the job time if the task progress is slow due to memory unavailability or hardware degradation. Cons: Increases the job time if the task progress is slow due to complex and large calculations. On a busy cluster speculative execution can reduce overall throughput, since redundant tasks are being executed in an attempt to bring down the execution time for a single job. Suggestions: In large jobs where average task completion time is significant (> 1 hr) due to complex and large calculations and high throughput is required the speculative execution should be set to false. 5
-Slide 6
-
-Number of Maps/Reducers m​a​p​r​e​d​.​t​a​s​k​t​r​a​c​k​e​r​.​m​a​p​/​r​e​d​u​c​e​.​t​a​s​k​s​.​ m​a​x​i​m​u​m​: Maximum tasks (map/reduce) for a tasktracker Default: 2 Suggestions: Recommended range - (cores_per_node)/2 to 2x(cores_per_node), especially for large clusters. This value should be set according to the hardware specification of cluster nodes and resource requirements of tasks (map/reduce). 6
-Slide 7
-
-File block size dfs.block.size: File system block size Default: 67108864 (bytes) Suggestions: Small cluster and large data set: default block size will create a large number of map tasks. e.g. Input data size = 160 GB and dfs.block.size = 64 MB then the minimum no. of maps= (160*1024)/64 = 2560 maps. If dfs.block.size = 128 MB minimum no. of maps= (160*1024)/128 = 1280 maps. If dfs.block.size = 256 MB minimum no. of maps= (160*1024)/256 = 640 maps.  In a small cluster (6-10 nodes) the map task creation overhead is considerable. So dfs.block.size should be large in this case but small enough to utilize all the cluster resources.  The block size should be set according to size of the cluster, map task complexity, map task capacity of cluster and average size of input files. 7
-Slide 8
-
-Sort size io.sort.mb: Buffer size (MBs) for sorting Default: 100 Suggestions: For Large jobs (the jobs in which map output is very large), this value should be increased keeping in mind that it will increase the memory required by each map task. So the increment in this value should be according to the available memory at the node. Greater the value of io.sort.mb, lesser will be the spills to the disk, saving write to the disk. 8
-Slide 9
-
-Sort factor io.sort.factor: Stream merge factor Default: 10 Suggestions: For Large jobs (the jobs in which map output is very large and number of maps are also large) which have large number of spills to disk, value of this property should be increased. The number of input streams (files) to be merged at once in the map/reduce tasks, as specified by io.sort.factor, should be set to a sufficiently large value (for example, 100) to minimize disk accesses. Increment in io.sort.factor, benefits in merging at reducers since the last batch of streams (equal to io.sort.factor) are sent to the reduce function without merging, thus saving time in merging. 9
-Slide 10
-
-JVM reuse : Reuse single JVM Default: 1 Suggestions: The minimum overhead of JVM creation for each task is around 1 second. So for the tasks which live for seconds or a few minutes and have lengthy initialization, this value can be increased to gain performance. 10
-Slide 11
-
-Reduce parallel copies m​a​p​r​e​d​.​r​e​d​u​c​e​.​p​a​r​a​l​l​e​l​.​c​o​p​i​e​s​: Threads for parallel copy at reducer Default: 5 Description: The number of threads used to copy map outputs to the reducer. Suggestions: For Large jobs (the jobs in which map output is very large), value of this property can be increased keeping in mind that it will increase the total CPU usage. 11
-Slide 12
-
-The Other Threads d​f​s​.​n​a​m​e​n​o​d​e​{​/​m​a​p​r​e​d​.​j​o​b​.​t​r​a​c​k​e​r​}​.​h​a​ n​d​l​e​r​.​c​o​u​n​t :server threads that handle remote procedure calls (RPCs) Default: 10 Suggestions: This can be increased for larger server (50-64). dfs.datanode.handler.count :server threads that handle remote procedure calls (RPCs) Default: 3 Suggestions: This can be increased for larger number of HDFS clients (6-8). tasktracker.http.threads : number of worker threads on the HTTP server on each TaskTracker Default: 40 Suggestions: The can be increased for larger clusters (50). 12
-Slide 13
-
-Other hotspots
-Slide 14
-
-Revelation-Temporary space Temporary space allocation: Jobs which generate large intermediate data (map output) should have enough temporary space controlled by property mapred.local.dir. This property specifies list directories where the MapReduce stores intermediate data for jobs. The data is cleaned-up after the job completes. By default, replication factor for file storage on HDFS is 3, which means that every file has three replicas. As a rule of thumb, at least 25% of the total hard disk should be allocated for intermediate temporary output. So effectively, only ¼ hard disk space is available for business use. The default value for mapred.local.dir is $​{​h​a​d​o​o​p​.​t​m​p​.​d​i​r​}​/​m​a​p​r​e​d​/​l​o​c​a​l​. So if mapred.local.dir is not set, hadoop.tmp.dir must have enough space to hold job’s intermediate data. If the node doesn’t have enough temporary space the task attempt will fail and starts a new attempt, thus impacting the performance. 14
-Slide 15
-
-Java- JVM JVM tuning: Besides normal java code optimizations, JVM settings for each child task also affects the processing time. On slave node end, the task tracker and data node use 1 GB RAM each. Effective use of the remaining RAM as well as choosing the right GC mechanism for each Map or Reduce task is very important for maximum utilization of hardware resources. The default max RAM for child tasks is 200MB which might be insufficient for many production grade jobs. The JVM settings for child tasks are governed by mapred.child.java.opts property. Use JDK 1.6 64 BIT– + +XX:CompressedOops helpful in dealing with OOM errors Do remember changing Linux open file descriptor Set java.net.preferIPv4Stack set to true, to avoid timeouts in cases where the OS/JVM picks up an IPv6 address and must resolve the hostname. 15
-Slide 16
-
-Logging Is a friend to developers, Foe in production Default - INFO level dfs.namenode.logging.level hadoop.job.history hadoop.logfile.size/count 16
-Slide 17
-
-Static Data strategies Available Approaches JobConf.set(“key”,”value”) Distributed cache HDFS shared file Suggested approaches if above ones not efficient Memcached Tokyocabinet/TokyoTyrant Berkley DB HBase 17
-Slide 18
-
-Debugging and profiling- Arun C Murthy Hadoop Map-Reduce – Tuning and Debugging- from Arun C Murthy presentation Debugging Log files/UI view Local runner Single machine mode Set keep.failed.task.files to true and use the IsolationRunner Profiling Set mapred.task.profile to true Use m​a​p​r​e​d​.​t​a​s​k​.​p​r​o​f​i​l​e​.​{​m​a​p​s​|​r​e​d​u​c​e​s​} hprof support is built-in Use mapred.task.profile.params to set options for the debugger Possibly DistributedCache for the profiler’s agent 18
-Slide 19
-
-Tuning - Arun C Murthy Hadoop Map-Reduce – Tuning and Debugging- from Arun C Murthy presentation Tuning Tell HDFS and Map-Reduce about your network! – Rack locality script: topology.script.file.name Number of maps – Data locality Number of reduces – You don’t need a single output file!Log files/UI view Amount of data processed per Map - Consider fatter maps, Custom input format Combiner - multi-level combiners at both Map and Reduce Check to ensure the combiner is useful! Map-side sort -io.sort.mb, io.sort.factor, io.sort.record.percent, io.sort.spill.percent Shuffle Compression for map-outputs – mapred.compress.map.output , m​a​p​r​e​d​.​m​a​p​.​o​u​t​p​u​t​.​c​o​m​p​r​e​s​s​i​o​n​.​c​o​d​e​c , lzo via libhadoop.so, tasktracker.http.threads m​a​p​r​e​d​.​r​e​d​u​c​e​.​p​a​r​a​l​l​e​l​.​c​o​p​i​e​s​, mapred.reduce.copy.backoff, m​a​p​r​e​d​.​j​o​b​.​s​h​u​f​f​l​e​.​i​n​p​u​t​.​b​u​f​f​e​r​.​p​e​r​c​ e​n​t​, m​a​p​r​e​d​.​j​o​b​.​s​h​u​f​f​l​e​.​m​e​r​g​e​.​p​e​r​c​e​n​t​, mapred.inmem.merge.threshold, m​a​p​r​e​d​.​j​o​b​.​r​e​d​u​c​e​.​i​n​p​u​t​.​b​u​f​f​e​r​.​p​e​r​c​e​ n​t Compress the job output Miscellaneous -Speculative execution, Heap size for the child, Re-use jvm for maps/reduces, Raw Comparators 19
-Slide 20
-
-Next steps Hadoop Vaidya (since 0.20.0) Job configuration analyzer (WIP-to be contributed back to Hadoop) Part of Analyze Job web ui Analyze and suggest config parameters from job.xml Smart suggestion engine/auto-correction 20
-Slide 21
-
-Conclusion Performance of Hadoop MapReduce jobs can be improved without increasing the hardware costs, by tuning several key configuration parameters for cluster specifications, input data size and processing complexity. 21
-Slide 22
-
-References Hadoop.apache.org Hadoop-performance tuning--white paper v1 1.pdf – Arun C Murthy I​n​t​e​l​_​W​h​i​t​e​_​P​a​p​e​r​_​O​p​t​i​m​i​z​i​n​g​_​H​a​d​o​o​p​_​ D​e​p​l​o​y​m​e​n​t​s​.​p​d​f 22 
+[1] Hadoop Performance Tuning - Milind Bhandarkar, Suhas Gogate, Viraj Bhat
+[2] Sanjay Sharma Advanced Hadoop Tuning and Optimizations  http://www.slideboom.com/presentations/116540/PPT-on-Advanced-Hadoop-Tuning-n-Optimisation
+[3] Todd Lipcon, many helpful advice sessions on #hadoop IRC
+[4] http://www.mentby.com/todd-lipcon/iosortmb-configuration.html
+[5] http://www.cloudera.com/blog/2009/03/configuration-parameters-what-can-you-just-ignore/
