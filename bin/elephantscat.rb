@@ -5,6 +5,7 @@ require 'imw'
 require 'configliere'
 require 'configliere/commandline'
 require 'fileutils'
+require 'set'
 
 Settings.define :archive_dir, :default => File.expand_path("~/timings"), :description => 'Where to store the archived job output'
 Settings.define :note, :default => "", :description => 'Where to store the archived job output'
@@ -13,7 +14,11 @@ Settings.resolve!
 #
 # FIXME: add these fields: started at, num_tasks, reduce_input_groups
 #
-NAMENODE_URL = "http://gibbon.infinitemonkeys.info"
+
+#
+# Namenode URL. make sure to use the local IP (or that the port is open to you)
+#
+NAMENODE_URL = "http://localhost"
 
 class JobDetails < TypedStruct.new(
     [:job_id,                String],
@@ -37,6 +42,13 @@ class JobDetails < TypedStruct.new(
     [:map_tasks,            Integer],
     [:reduce_tasks,         Integer]
     )
+
+  def started_at= dt
+    super DateTime.parse_and_flatten(dt)
+  end
+  def finished_at dt
+    super DateTime.parse_and_flatten(dt)
+  end
 end
 
 class JobDetailsParser
@@ -57,12 +69,12 @@ class JobDetailsParser
   def extract_num_table imw_obj
     ripd = imw_obj.parse ["table[1]//tr", {:row => ["td"]}]
     # we only want to keep the rows that have a bunch of elements
-    rawd = ripd.select {|ele| ele[:row] && ele[:row].length > 1}.map do |ele|
+    rawd = ripd.select{|ele| ele[:row] && ele[:row].length > 2}.map do |ele|
       ele[:row]
     end
     rawd
   end
- 
+
   def extract_raw_table imw_obj
     ripd = imw_obj.parse ["table[2]//tr", {:row => ["td"]}]
     rawd = ripd.map do |ele|
@@ -70,10 +82,10 @@ class JobDetailsParser
     end
     rawd
   end
- 
+
   def extract_top_table raw
     table = {}
-    raw.scan(/^<b>([^:]+):<\/b>\s*(.*)\s*<br>/) {|key,value| table[key] = value}
+    raw.scan(/^<b>([^:]+):<\/b>\s*(.*)\s*<br>/){|key,value| table[key] = value}
     return table;
   end
 
@@ -90,23 +102,104 @@ class JobDetailsParser
     fixd_hsh
   end
 
-  def parse jobdetails_file, &blk
+  def parse jobdetails_file, &block
     data       = IMW.open(jobdetails_file)
     raw_string = IMW.open(jobdetails_file).read
     top_table  = extract_top_table raw_string
     num_table  = extract_num_table IMW.open(jobdetails_file)
     rawd       = extract_raw_table data
-    fixd       = raw_table_to_hash rawd
-    fixd[:job_id]   = File.basename(jobdetails_file).gsub('.html', '')
-    fixd[:run_time] = extract_header( raw_string, '(?:Finished|Killed) in')
-    fixd[:job_name] = extract_header( raw_string, 'Job Name')
-    fixd[:finished] = top_table["Status"].to_s.downcase == "failed" ? 0 : 1
-    fixd[:started_at] = top_table["Started at"].to_s
-    fixd[:finished_at] = top_table["Finished at"].to_s
-    fixd[:map_tasks] = num_table[0][2]
-    fixd[:reduce_tasks] = num_table[1][2]
- 
-    yield JobDetails.from_hash(fixd)
+    details = JobDetails.from_hash(raw_table_to_hash(rawd))
+
+    details.job_id       = File.basename(jobdetails_file).gsub('.html', '')
+    details.run_time     = extract_header( raw_string, '(?:Finished|Killed) in')
+    details.job_name     = extract_header( raw_string, 'Job Name')
+    details.finished     = top_table["Status"].to_s.downcase == "failed" ? 0 : 1
+    details.started_at   = top_table["Started at" ]
+    details.finished_at  = top_table["Finished at"]
+    details.map_tasks    = num_table[0][-6].to_i
+    details.reduce_tasks = num_table[1][-6].to_i
+
+    yield  details if block
+    return details
+  end
+
+end
+
+class JobTasks
+  attr_accessor :job_slug, :num_map_tasks, :num_reduce_tasks
+
+  def initialize job_slug, num_map_tasks, num_reduce_tasks
+    self.job_slug           = job_slug
+    self.num_map_tasks    = num_map_tasks
+    self.num_reduce_tasks = num_reduce_tasks
+  end
+
+  def task_id_for phase, task_num
+    "task_#{job_slug}_#{phase}_#{"%06d"%task_num}"
+  end
+
+  def extract_counters_table raw
+    ripd = raw.parse ["table[1]//tr", { :row => ["td"] }]
+    counters = { }
+    ripd.each do |ele|
+      counter_row = ele[:row]
+      next if counter_row[2].blank?
+      counters[counter_row[1]] = counter_row[2].gsub(/,/,"")
+    end
+    counters
+  end
+
+  def parse task_counters_file, &blk
+    extract_counters_table IMW.open(task_counters_file)
+  end
+
+  def job_path
+    File.join(Settings.archive_dir, 'job', job_slug.to_s.gsub(/_/, '/'))
+  end
+  def task_counters_path
+    File.join(job_path, "tasks-#{job_slug}")
+  end
+  def task_counters_filename(task_id)    File.join(task_counters_path, "/counters-#{task_id}.html")  end
+  def tasks_overview_filename(phase)     File.join(job_path, "tasks-#{job_slug}-#{phase}.html")   end
+  def task_counter_stats_filename(phase) File.join(job_path, "counters-#{job_slug}-#{phase}.tsv") end
+
+  # Whtere to find the task counters table
+  def task_counters_url(task_id)
+    NAMENODE_URL + ":50030/taskstats.jsp?jobid=job_#{job_slug}&tipid=#{task_id}"
+  end
+  # Tasks listing
+  def tasks_overview_url phase
+    phase_name = (phase == 'm') ? "map" : "reduce"
+    NAMENODE_URL + ":50030/jobtasks.jsp?jobid=job_#{job_slug}&type=#{phase_name}&pagenum=1&state=completed"
+  end
+
+  def fetch_task_counters
+    fetch_task_counters_for 'm', num_map_tasks
+    fetch_task_counters_for 'r', num_reduce_tasks
+  end
+
+  def fetch_task_counters_for phase, num_tasks
+    ArchivableJob.fetch_url( tasks_overview_url(phase), tasks_overview_filename(phase), true )
+    FileUtils.mkdir_p(task_counters_path)
+    task_counters     = []
+    task_counter_keys = Set.new
+    (0...num_tasks).each do |task_num|
+      task_id = task_id_for(phase, task_num)
+      tc_file = task_counters_filename(task_id)
+      ArchivableJob.fetch_url(task_counters_url(task_id), tc_file)
+      counters = parse(tc_file)
+      task_counters << counters
+      task_counter_keys += counters.keys.to_set
+    end
+    cols = task_counter_keys.to_a.sort
+    File.open(task_counter_stats_filename(phase), 'w') do |task_counter_stats_file|
+      task_counter_stats_file << ["task_counters", cols].flatten.join("\t")+"\n"
+      task_counters.each do |tc|
+        tc_str = (["task_counters"]+tc.values_of(*cols)).join("\t")+"\n"
+        task_counter_stats_file << tc_str
+        puts tc_str
+      end
+    end
   end
 
 end
@@ -140,14 +233,14 @@ class ArchivableJob
   def note_filename
     File.join(archive_path, "note-#{slug}.txt")
   end
-  
+
   # Where to find the jobdetails HTML page (the one that is parsed)
   def jobdetails_url
-    NAMENODE_URL + ":50030" + "/jobdetails.jsp?jobid=" + job_id
+    NAMENODE_URL + ":50030/jobdetails.jsp?jobid=#{job_id}"
   end
   # Where to find the jobconf xml
   def jobconf_url
-    NAMENODE_URL + ":50030" + "/jobconf.jsp?jobid=" + job_id
+    NAMENODE_URL + ":50030/jobconf.jsp?jobid=#{job_id}"
   end
 
   #Is there a note associated with this job?
@@ -163,7 +256,14 @@ class ArchivableJob
     note_file << note
     note_file.close
   end
-  
+
+  def self.fetch_url url, filename, force=false
+    unless File.exists?(filename) || force
+      $stderr.print "Fetching #{File.basename(filename)}"
+      $stderr.puts  %x{curl -s '#{url}' -o '#{filename}'}
+    end
+  end
+
   #
   # Use curl to fetch the jobdetails page
   #
@@ -171,23 +271,25 @@ class ArchivableJob
     FileUtils.mkdir_p(File.dirname(jobdetails_filename))
     FileUtils.mkdir_p(File.dirname(jobconf_filename))
     store_note
-    $stderr.print %x{curl -s #{jobdetails_url} -o #{jobdetails_filename}}
-    $stderr.print %x{curl -s #{jobconf_url}    -o #{jobconf_filename}}
+    ArchivableJob.fetch_url(jobdetails_url, jobdetails_filename)
+    ArchivableJob.fetch_url(jobconf_url,    jobconf_filename)
+    details = parse()
+    tasks = JobTasks.new(slug, [details.map_tasks, 450].min, [details.reduce_tasks,0].min)
+    tasks.fetch_task_counters
   end
 
-  def parse &block
+  def parse
     parser = JobDetailsParser.new
+    details = parser.parse(jobdetails_filename)
     File.open(stats_filename, 'w') do |stats_file|
-      parser.parse(jobdetails_filename)  do |details|
-        puts details.to_flat.join("\t")
-        stats_file << details.to_flat.join("\t")+"\n"
-        yield details if block
-      end
+      puts details.to_flat.join("\t")
+      stats_file << details.to_flat.join("\t")+"\n"
     end
+    details
   end
 end
 
-job_id = Settings.rest.first
-job = ArchivableJob.new(job_id)
-job.archive!
-job.parse
+Settings.rest.each do |job_id|
+  job = ArchivableJob.new(job_id)
+  job.archive!
+end
