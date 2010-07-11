@@ -10,10 +10,10 @@
 --
 
 network      = LOAD '$CURR_ITER_FILE' AS (user_a:long, rank:float, out_links:bag { link:tuple (user_b:long) });
-sent_shares  = FOREACH network GENERATE FLATTEN(out_links) AS user_b, (float)(rank / SIZE(out_links)) AS share:float;
+sent_shares  = FOREACH network GENERATE FLATTEN(out_links) AS user_b, (float)(rank / (float)SIZE(out_links)) AS share:float;
 sent_links   = FOREACH network GENERATE user_a, out_links;
 
-rcvd_shares  = COGROUP sent_shares BY user_b, sent_links BY user_a PARALLEL 58;
+rcvd_shares  = COGROUP sent_links BY user_a INNER, sent_shares BY user_b PARALLEL 58;
 next_iter    = FOREACH rcvd_shares
                {
                    raw_rank    = (float)SUM(sent_shares.share);
