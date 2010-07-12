@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Run this with 2 mappers and 1 reducer on m1.large
-export PIG_OPTS='-Dio.sort.record.percent=0.43 -Dio.sort.mb=530 -Dio.sort.factor=52 -Dio.sort.spill.percent=0.88 -Dmapred.job.reuse.jvm.num.tasks=-1'
+# Run this with 2 mappers and 2 reducers on m1.large
+#   (you can force this with something like -Dmapred.max.reduces.per.node=2 -Dmapred.max.maps.per.node=2)
+export PIG_OPTS='-Dio.sort.record.percent=0.43 -Dio.sort.mb=530 -Dio.sort.factor=32 -Dio.sort.spill.percent=0.88 -Dmapred.job.reuse.jvm.num.tasks=-1'
 
 # Directory to pagerank on.
 work_dir=$1     ; shift

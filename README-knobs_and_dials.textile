@@ -41,6 +41,16 @@ You want the number of running tasks to be the same as the number of cores.
 
 * Swapping and Java VM options: http://www.mail-archive.com/common-user@hadoop.apache.org/msg05462.html
 
+h3. Cluster and per-job limits on tasktracker slots
+
+* mapred.tasktracker.reduce.tasks.maximum          1
+* mapred.tasktracker.map.tasks.maximum             2
+* mapred.max.reduces.per.node                     -1
+* mapred.max.maps.per.node                        -1  -- can be set per-job. see https://issues.apache.org/jira/browse/HADOOP-5170
+* mapred.max.maps.per.cluster                     -1
+* mapred.max.reduces.per.cluster                  -1  -- can be set per-job. see https://issues.apache.org/jira/browse/HADOOP-5170
+* mapred.jobtracker.maxtasks.per.job              -1  -- used chiefly as a cap to protect jobtracker VM from overheating
+
 h3. Tuning checks
 
 A definition: _Active worker_ means either the task workers or (if streaming) its child process -- that is, not the tasktracker or the datanode, and not any other job on the machine
@@ -59,7 +69,7 @@ h2. How much memory
 
 h3. Parameters in question
 
-* @java_heap_size@: the @-Xmx=XXXm@ parameter in @mapred.child.java.opts@. Memory cap for the worker java processes
+* @java_max_heap@: the @-Xmx=XXXm@ parameter in @mapred.child.java.opts@. Memory cap for the worker java processes
 * @mapred.child.ulimit@: max memory for the worker process and all child processes (for instance, streaming workers).
 * @node_tasks@: may need to be reduced 
 
@@ -101,11 +111,6 @@ mapred.output.compress
 io.seqfile.sorter.recordlimit           1000000
 io.seqfile.compress.blocksize           1000000
 
-mapred.max.reduces.per.node                     -1
-mapred.jobtracker.maxtasks.per.job              -1
-mapred.max.maps.per.node                        -1
-mapred.tasktracker.reduce.tasks.maximum         1
-mapred.tasktracker.map.tasks.maximum            2
 io.mapfile.bloom.size
 io.mapfile.bloom.error.rate
 io.file.buffer.size                             65536    -- a solid default
@@ -119,39 +124,22 @@ raw comparators
 mapred.task.profile
 mapred.task.profile.params
 
-# -XX:+UseCompressedOops -XX:MaxNewSize=200m -XX:+UseParallelGC -XX:ParallelGCThreads=2
-# -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode
-# -server -XX:+AggressiveOpts 
-# export HADOOP_OPTS=-server 
-
-#                     -XX:+UseParallelGC -XX:ParallelGCThreads=2 -XX:MaxNewSize=200m
-# -XX:SurvivorRatio=8 -XX:+UseParallelGC -XX:ParallelGCThreads=20 -XX:+UseParallelOldGC
-# Use NUMA if available (-XX:+UseNUMA)
-# and -XX:+UseTLAB
-
-* JVM to use -XX:+UseLargePages needs to set kernel options too: http://andrigoss.blogspot.com/2008/02/jvm-performance-tuning.html
-* 
-* Java GC tuning: http://java.sun.com/javase/technologies/hotspot/gc/gc_tuning_6.html#icms
-** -XX:+UseConcMarkSweepGC -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError -Xloggc:/var/log/hadoop/gc-hadoop.log
-** Scott Carey: "I have found some notes that suggest that -XX:-ReduceInitialCardMarks will 
-work around some known crash problems with 6u18, but that may be unrelated."
-
 file descriptor ulimit
 java.net.preferIPv4Stack=true
 
 In practice, we just use the the total tasks' heap size  to :
 
 <pre>
-  node_tasks * java_heap_size =~ 0.9 * available ram
+  node_tasks * java_max_heap =~ 0.9 * available ram
 </pre>
 
-This mapred.child.ulimit  defends against a runaway child task eating all your ram. It must be *greater than* java_heap_size. Set it at 2 to 3 times the java_heap_size -- give yourself some breathing room, as you can adjust the mapred.java.child.opts per-job but not the mapred.child.ulimit limit.
+This mapred.child.ulimit  defends against a runaway child task eating all your ram. It must be *greater than* java_max_heap. Set it at 2 to 3 times the java_max_heap -- give yourself some breathing room, as you can adjust the mapred.java.child.opts per-job but not the mapred.child.ulimit limit.
 
 
-The total sort buffers for all must fit in heap with room to spare. 
+The total sort buffers for all must fit in heap with room to spare. There's more discussion of java_max_heap below, under 'JVM Tuning'.
 
 <pre>
-  io.sort.mb < mapred.child.java.opts
+  io.sort.mb << java_max_heap
 </pre>
 
 <pre>
@@ -250,6 +238,31 @@ h3. Reduce-side spills
   io.sort.factor                number of segments to keep in memory before writing to disk
 
 
+
+h3. JVM Tuning
+
+# -XX:+UseCompressedOops -XX:MaxNewSize=200m -XX:+UseParallelGC -XX:ParallelGCThreads=2
+# -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode
+# -server -XX:+AggressiveOpts 
+# export HADOOP_OPTS=-server 
+
+* Don't set the heap size to totally stack up the machine -- you need to leave some overhead for system cache and buffers -- it's possible to totally hose throughput by putting the machine into IO-contention hell.
+* If you are on Linux and run no swap, you *definitely* want to fix the vm @overcommit_memory@ and @overcommit_ratio@. If you do run swap, you should also look at the vm's @swappiness@ setting.
+* If you blindly increase the heap size, 
+
+#                     -XX:+UseParallelGC -XX:ParallelGCThreads=2 -XX:MaxNewSize=200m
+# -XX:SurvivorRatio=8 -XX:+UseParallelGC -XX:ParallelGCThreads=20 -XX:+UseParallelOldGC
+# Use NUMA if available (-XX:+UseNUMA)
+# and -XX:+UseTLAB
+
+* JVM to use -XX:+UseLargePages needs to set kernel options too: http://andrigoss.blogspot.com/2008/02/jvm-performance-tuning.html
+* 
+* Java GC tuning: http://java.sun.com/javase/technologies/hotspot/gc/gc_tuning_6.html#icms
+** -XX:+UseConcMarkSweepGC -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError -Xloggc:/var/log/hadoop/gc-hadoop.log
+** Scott Carey: "I have found some notes that suggest that -XX:-ReduceInitialCardMarks will 
+work around some known crash problems with 6u18, but that may be unrelated."
+
+
 h2. IO optimization
 
 
@@ -260,7 +273,8 @@ h3. Map-side compression
   mapred.map.output.compression.codec
   mapred.output.compression.codec	org.apache.hadoop.io.compress.DefaultCodec
   mapred.output.compression.type	BLOCK
-  
+
+
 
 h2. Avoiding Master process bottlenecks
 
