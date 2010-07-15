@@ -14,7 +14,6 @@ count_links = FOREACH list_links
                   GENERATE
                       group           AS user_a,
                       1.0             AS rank,
-                      num_out_links   AS num_out_links,
                       cut_links.user_b  AS out_links
                   ;
               };
