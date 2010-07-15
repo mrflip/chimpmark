@@ -1,20 +1,26 @@
 --
 -- Create initial graph on which to iterate the pagerank algorithm.
 --
-%default ADJLIST  '../data/seinfeld_network.tsv'
-%default INITGRPH '../data/pagerank_graph_000'
-        
-network = LOAD '$ADJLIST' AS (rsrc:chararray, user_a:chararray, user_b:chararray);
+%default ADJLIST  'sample.tsv'
+%default INITGRPH 'pagerank_graph_000'
 
+--
+-- Generate a unique list of nodes with in links to cogroup on. This allows
+-- us to treat the case where nodes have in links but no out links.
+--
+network     = LOAD '$ADJLIST' AS (rsrc:chararray, user_a:long, user_b:long);
+cut_rhs     = FOREACH network GENERATE user_b;
+uniq_rhs    = DISTINCT cut_rhs;
 cut_links   = FOREACH network GENERATE user_a, user_b;
-list_links  = GROUP cut_links BY user_a;
+list_links  = COGROUP cut_links BY user_a, uniq_rhs BY user_b;
 count_links = FOREACH list_links
               {
-                  num_out_links = COUNT(cut_links);
+                  -- if cut_links.user_b is empty there are no out links, set to dummy value
+                  out_links = (IsEmpty(cut_links.user_b) ? {(999999999)} : cut_links.user_b);
                   GENERATE
-                      group           AS user_a,
-                      1.0             AS rank,
-                      cut_links.user_b  AS out_links
+                      group     AS user_a,
+                      1.0       AS rank,
+                      out_links AS out_links
                   ;
               };
 
