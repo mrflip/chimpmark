@@ -69,5 +69,7 @@ end
 # Execute the script
 Wukong::Script.new(
   FlattenXml,
-  nil
+  nil,
+  :split_on_xml_tag => 'page',
+  :min_split_size   => '536870912'
   ).run
