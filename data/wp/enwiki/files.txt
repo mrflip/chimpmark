@@ -1,0 +1,35 @@
+http://download.wikimedia.org/enwiki/20101011/
+
+
+3090226993	/wp/enwiki/20101011/enwiki-20101011-abstract.xml                  abstract.xml                 2.9 GB 	# 2010-10-14 12:46:26 done Extracted page abstracts for Yahoo   2010-10-14 12:46:26: enwiki 21862415 pages (86.897/sec), 21862416 revs (86.897/sec), ETA 2010-10-15 12:04:42 [max 29152778]
+  44658610	/wp/enwiki/20101011/enwiki-20101011-all-titles-in-ns0.gz          all-titles-in-ns0.gz        42.6 MB 	# 2010-10-11 14:53:16 done List of page titles
+  13707310	/wp/enwiki/20101011/enwiki-20101011-category.sql.gz               category.sql.gz             13.1 MB 	# 2010-10-11 14:47:21 done Category information.
+ 693939457	/wp/enwiki/20101011/enwiki-20101011-categorylinks.sql.gz          categorylinks.sql.gz       661.8 MB 	# 2010-10-11 12:57:18 done Wiki category membership link records.
+ 835501636	/wp/enwiki/20101011/enwiki-20101011-externallinks.sql.gz          externallinks.sql.gz       796.8 MB 	# 2010-10-11 14:42:42 done Wiki external URL link records.
+      9718	/wp/enwiki/20101011/enwiki-20101011-flaggedpages.sql.gz           flaggedpages.sql.gz          9   KB 	# 2010-10-16 16:52:25 done This contains a row for each flagged article, containing the stable revision ID, if the lastest edit was flagged, and how long edits have been pending.
+   1541560	/wp/enwiki/20101011/enwiki-20101011-flaggedrevs.sql.gz            flaggedrevs.sql.gz           1.5 MB 	# 2010-10-16 16:52:26 done This contains a row for each flagged revision, containing who flagged it, when it was flagged, reviewer comments, the flag values, and the quality tier those flags fall under.
+ 113905980	/wp/enwiki/20101011/enwiki-20101011-image.sql.gz                  image.sql.gz               108.6 MB 	# 2010-10-11 09:56:14 done Metadata on current versions of uploaded images.
+ 244646437	/wp/enwiki/20101011/enwiki-20101011-imagelinks.sql.gz             imagelinks.sql.gz          233.3 MB 	# 2010-10-11 13:09:15 done Wiki image usage records.
+      7903	/wp/enwiki/20101011/enwiki-20101011-interwiki.sql.gz              interwiki.sql.gz             7   KB 	# 2010-10-11 14:47:14 done Set of defined interwiki prefixes and links for this wiki.
+ 115035382	/wp/enwiki/20101011/enwiki-20101011-langlinks.sql.gz              langlinks.sql.gz           109.7 MB 	# 2010-10-11 14:47:13 done Wiki interlanguage link records.
+      1874	/wp/enwiki/20101011/enwiki-20101011-md5sums.txt                   
+  17191314	/wp/enwiki/20101011/enwiki-20101011-oldimage.sql.gz               oldimage.sql.gz             16.4 MB 	# 2010-10-11 09:56:22 done Metadata on prior versions of uploaded images.
+ 718889462	/wp/enwiki/20101011/enwiki-20101011-page.sql.gz                   page.sql.gz                685.6 MB 	# 2010-10-11 14:50:40 done Base per-page data (id, title, old restrictions, etc).
+     26552	/wp/enwiki/20101011/enwiki-20101011-page_props.sql.gz             page_props.sql.gz           25   KB 	# 2010-10-11 14:50:43 done Name/value pairs for pages.
+    577795	/wp/enwiki/20101011/enwiki-20101011-page_restrictions.sql.gz      page_restrictions.sql.gz   564   KB 	# 2010-10-11 14:50:43 done Newer per-page restrictions table.
+3576839493	/wp/enwiki/20101011/enwiki-20101011-pagelinks.sql.gz              pagelinks.sql.gz             3.3 GB 	# 2010-10-11 12:31:45 done Wiki page-to-page link records.
+4065806321	/wp/enwiki/20101011/enwiki-20101011-pages-articles.xml.bz2        pages-articles.xml.bz2       6.2 GB 	# 2010-10-15 18:50:49 done This contains current versions of article content, and is the archive most mirror sites will probably want. * Articles, templates, image descriptions, and primary meta-pages. * 2010-10-15 18:50:49: enwiki 10476611 pages (196.522/sec), 10476611 revs (196.522/sec), 87.3% prefetched, ETA 2010-10-16 21:18:44 [max 29200072]
+1234635583	/wp/enwiki/20101011/enwiki-20101011-pages-logging.xml.gz          pages-logging.xml.gz         1.1 GB 	# 2010-10-16 16:52:19 done This contains the log of actions performed on pages.
+                                                                                  pages-meta-current.xml.bz2  11.9 GB 	# 2010-10-16 14:59:09 done Discussion and user pages are included in this complete archive. Most mirrors won't want this extra material. * All pages, current versions only. * 2010-10-16 14:59:09: enwiki 21894705 pages (302.615/sec), 21894705 revs (302.615/sec), 91.3% prefetched, ETA 2010-10-16 21:41:50 [max 29206388]
+    679931	/wp/enwiki/20101011/enwiki-20101011-protected_titles.sql.gz       protected_titles.sql.gz    663   KB 	# 2010-10-11 14:50:44 done Nonexistent pages that have been protected.
+  46557283	/wp/enwiki/20101011/enwiki-20101011-redirect.sql.gz               redirect.sql.gz             44.4 MB 	# 2010-10-11 14:52:56 done Redirect list
+       795	/wp/enwiki/20101011/enwiki-20101011-site_stats.sql.gz             site_stats.sql.gz          795   b  	# 2010-10-11 09:54:10 done A few statistics such as the page count.
+                                                                                  stub-articles.xml.gz       637.9 MB 	# 2010-10-15 03:55:50 done These files contain no page text, only revision metadata. * Creating split stub dumps... * 2010-10-15 03:55:50: enwiki 21894705 pages (401.769/sec), 359407803 revs (6595.150/sec), ETA 2010-10-15 05:14:53 [max 390684614]
+                                                                                  stub-meta-current.xml.gz     1.3 GB 	# 2010-10-15 03:55:50 done These files contain no page text, only revision metadata. * Creating split stub dumps... * 2010-10-15 03:55:50: enwiki 21894705 pages (401.769/sec), 359407803 revs (6595.150/sec), ETA 2010-10-15 05:14:53 [max 390684614]
+                                                                                  stub-meta-history.xml.gz    13.8 GB 	# 2010-10-15 03:55:50 done These files contain no page text, only revision metadata. * Creating split stub dumps... * 2010-10-15 03:55:50: enwiki 21894705 pages (401.769/sec), 359407803 revs (6595.150/sec), ETA 2010-10-15 05:14:53 [max 390684614]
+ 895520929	/wp/enwiki/20101011/enwiki-20101011-templatelinks.sql.gz          templatelinks.sql.gz       854.0 MB 	# 2010-10-11 14:25:52 done Wiki template inclusion link records.
+     61687	/wp/enwiki/20101011/enwiki-20101011-user_groups.sql.gz            user_groups.sql.gz          60   KB 	# 2010-10-11 14:47:14 done User group assignments.
+     13688	/wp/enwiki/20101011/index.html                                    
+
+
+     

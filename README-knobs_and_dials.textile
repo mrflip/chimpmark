@@ -38,8 +38,9 @@ You want the number of running tasks to be the same as the number of cores.
 
 * If you are running in a streaming context, you might want to run either fewer or more tasks per node! Start with the defaults and follow tuning instructions below.
 
-
 * Swapping and Java VM options: http://www.mail-archive.com/common-user@hadoop.apache.org/msg05462.html
+
+If you have a lot of data coming off Amazon s3, you may want to turn up mapred.min.split.size. The default block size for the s3hdfs is 32MB; a 1TB input dataset gives 30k map tasks -- yikes! Instead, bump the mapred.min.split.size up. With a high-memory low-cpu machine like the m2.xlarge (our machine of choice) you can set this as large as 512MB, turning up the io.sort.mb (so that you don't get spill) and bob's your uncle.
 
 h3. Cluster and per-job limits on tasktracker slots
 
@@ -222,11 +223,12 @@ To get to the magic one-spill number, run your job for long enough that some map
     # edge it up a little, and round
     io_sort_record_percent = (105 * io_sort_record_percent).round / 100.0
     io_sort_spill_percent  = 0.80
-    io_sort_mb             = map_output_bytes / (io_sort_spill_percent * (1 - io_sort_record_percent))
-    { :io_sort_record_percent => io_sort_record_percent
-      :io_sort_mb             => io_sort_mb
-      :io_sort_factor         => io_sort_mb / 10.0
-      :io_sort_spill_percent  => io_sort_spill_percent
+    io_sort_bytes          = map_output_bytes / (io_sort_spill_percent * (1 - io_sort_record_percent))
+    io_sort_mb             = io_sort_bytes / (1024*1024)
+    { :io_sort_record_percent => io_sort_record_percent,
+      :io_sort_mb             => io_sort_mb,
+      :io_sort_factor         => io_sort_mb / 10.0,
+      :io_sort_spill_percent  => io_sort_spill_percent,
     }
   end
 </pre>
