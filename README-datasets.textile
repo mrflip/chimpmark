@@ -1,9 +1,4 @@
 
-
-
-
-
-
 h2. Document Dataset: Wikipedia English Articles XML
 
 http://meta.wikimedia.org/wiki/Data_dumps
