@@ -54,7 +54,13 @@ Send weather observations to macro tiles, and calculate statistics (min, max, av
 
 ### Anomaly Detection on a Timeseries
 
+Pageview anomalies
+
+Sessionize pageviews
+
 ### Logistic Regression
+
+Which pages are correlated with the weather?
 
 ### Pagerank
 
@@ -82,6 +88,30 @@ http://www.linguistics.ucsb.edu/faculty/stgries/research/2008_STG_Dispersion_IJC
 
 
 ### Co-ocurrence Graph
+
+See Mining of Massive Datasets p208 - a-priori algorithm...
+step I calculate frequent items
+
+Step II:
+1. For each basket, look in the frequent-items table to see which of its items are frequent.
+2. In a double loop, generate all frequent pairs.
+3. For each frequent pair, add one to its count in the data structure used to
+store counts.
+4. Finally, at the end of the second pass, examine the structure of counts to determine which pairs are frequent.
+
+Park, Chen, and Yu (PCY)
+
+In step I, keep a count of items. Also, for each piar take hash and bump the count in that bucket.
+
+We can define the set of candidate pairs C2 to be those pairs {i, j} such that:
+1. i and j are frequent items.
+2. {i, j} hashes to a frequent bucket.
+For even better results, use two or more hashes (each in a separate hash table)
+
+
+### Shingling of Documents
+
+
 
 ### K-Means Clustering
 
@@ -183,6 +213,8 @@ Sources:
 * [MySQL manual](http://dev.mysql.com/doc/refman/5.6/en/func-op-summary-ref.html)
 * [Scripting language comparisons](http://hyperpolyglot.org/scripting)
 * [DataFu](http://sna-projects.com/datafu/javadoc/0.0.1/)
+
+* [Mining of Massive Datasets](http://infolab.stanford.edu/~ullman/mining/mining.html)
 
 #### Optimizations
 
