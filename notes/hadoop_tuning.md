@@ -78,11 +78,11 @@ h3. Parameters in question
 
 You can count on your input being one block big in general:
 
-<pre>
-  dfs.block.size    := 134217728    # 128M
-  fs.s3.block.size  :=  67108864
-  avg_map_input_mb   = 128
-</pre>
+```
+    dfs.block.size    := 134217728    # 128M
+    fs.s3.block.size  :=  67108864
+    avg_map_input_mb   = 128
+```
 
 * a smaller block size will lead to more map tasks per job
 * a larger block size will lead to early spill and more map-side memory pressure
@@ -130,23 +130,23 @@ java.net.preferIPv4Stack=true
 
 In practice, we just use the the total tasks' heap size  to :
 
-<pre>
-  node_tasks * java_max_heap =~ 0.9 * available ram
-</pre>
+```
+    node_tasks * java_max_heap =~ 0.9 * available ram
+```
 
 This mapred.child.ulimit  defends against a runaway child task eating all your ram. It must be *greater than* java_max_heap. Set it at 2 to 3 times the java_max_heap -- give yourself some breathing room, as you can adjust the mapred.java.child.opts per-job but not the mapred.child.ulimit limit.
 
 
 The total sort buffers for all must fit in heap with room to spare. There's more discussion of java_max_heap below, under 'JVM Tuning'.
 
-<pre>
-  io.sort.mb << java_max_heap
-</pre>
+```
+    io.sort.mb << java_max_heap
+```
 
-<pre>
-  echo 1   > /proc/sys/vm/overcommit_memory
-  echo 100 > /proc/sys/vm/overcommit_ratio
-</pre>
+```
+    echo 1   > /proc/sys/vm/overcommit_memory
+    echo 100 > /proc/sys/vm/overcommit_ratio
+```
   
 
 h3. Minimize map-side spills
@@ -154,49 +154,49 @@ h3. Minimize map-side spills
 
 This is good:
 
-<pre>
-        2010-07-10 19:29:07,386 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
-        2010-07-10 19:29:07,906 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
-        2010-07-10 19:29:07,906 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
-        2010-07-10 19:30:02,565 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
-        2010-07-10 19:30:08,091 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
-        2010-07-10 19:30:08,093 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
-        2010-07-10 19:30:08,094 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
-        2010-07-10 19:30:43,144 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
-        2010-07-10 19:30:43,147 INFO org.apache.hadoop.mapred.TaskRunner: Task:attempt_201007101502_0006_m_000040_0 is done. And is in the process of commiting
-        2010-07-10 19:30:43,150 INFO org.apache.hadoop.mapred.TaskRunner: Task 'attempt_201007101502_0006_m_000040_0' done.
-</pre>
+```
+    2010-07-10 19:29:07,386 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
+    2010-07-10 19:29:07,906 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
+    2010-07-10 19:29:07,906 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
+    2010-07-10 19:30:02,565 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
+    2010-07-10 19:30:08,091 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
+    2010-07-10 19:30:08,093 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
+    2010-07-10 19:30:08,094 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
+    2010-07-10 19:30:43,144 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
+    2010-07-10 19:30:43,147 INFO org.apache.hadoop.mapred.TaskRunner: Task:attempt_201007101502_0006_m_000040_0 is done. And is in the process of commiting
+    2010-07-10 19:30:43,150 INFO org.apache.hadoop.mapred.TaskRunner: Task 'attempt_201007101502_0006_m_000040_0' done.
+```
 
 This is bad:
 
-<pre>
-        2010-07-10 20:37:31,355 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
-        2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
-        2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
-        2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
-        2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: bufstart = 0; bufend = 100992858; bufvoid = 205520896
-        2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: kvstart = 0; kvend = 4404019; length = 5505024
-        2010-07-10 20:38:48,302 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
-        2010-07-10 20:38:48,303 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
-        2010-07-10 20:38:48,304 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
-        2010-07-10 20:39:13,523 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
-        2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
-        2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: bufstart = 100992858; bufend = 201882339; bufvoid = 205520896
-        2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: kvstart = 4404019; kvend = 3303013; length = 5505024
-        2010-07-10 20:40:39,941 INFO org.apache.hadoop.mapred.MapTask: Finished spill 1
-        2010-07-10 20:41:03,286 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
-        2010-07-10 20:41:33,125 INFO org.apache.hadoop.mapred.MapTask: Finished spill 2
-        2010-07-10 20:41:33,354 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
-        2010-07-10 20:41:33,359 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
-        2010-07-10 20:41:33,361 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
-        2010-07-10 20:41:33,362 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
-        2010-07-10 20:41:33,362 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 925614 bytes
-        2010-07-10 20:41:34,832 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
-        2010-07-10 20:41:34,835 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 857190 bytes
-        2010-07-10 20:41:36,085 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
-        2010-07-10 20:41:36,087 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 902202 bytes
-        ... another 100+ seconds in merge ...
-</pre>
+```
+    2010-07-10 20:37:31,355 INFO org.apache.hadoop.mapred.MapTask: io.sort.mb = 280
+    2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: data buffer = 164416720/205520896
+    2010-07-10 20:37:31,816 INFO org.apache.hadoop.mapred.MapTask: record buffer = 4404019/5505024
+    2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
+    2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: bufstart = 0; bufend = 100992858; bufvoid = 205520896
+    2010-07-10 20:38:22,882 INFO org.apache.hadoop.mapred.MapTask: kvstart = 0; kvend = 4404019; length = 5505024
+    2010-07-10 20:38:48,302 INFO org.apache.hadoop.util.NativeCodeLoader: Loaded the native-hadoop library
+    2010-07-10 20:38:48,303 INFO org.apache.hadoop.io.compress.zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
+    2010-07-10 20:38:48,304 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new compressor
+    2010-07-10 20:39:13,523 INFO org.apache.hadoop.mapred.MapTask: Finished spill 0
+    2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: Spilling map output: record full = true
+    2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: bufstart = 100992858; bufend = 201882339; bufvoid = 205520896
+    2010-07-10 20:39:49,654 INFO org.apache.hadoop.mapred.MapTask: kvstart = 4404019; kvend = 3303013; length = 5505024
+    2010-07-10 20:40:39,941 INFO org.apache.hadoop.mapred.MapTask: Finished spill 1
+    2010-07-10 20:41:03,286 INFO org.apache.hadoop.mapred.MapTask: Starting flush of map output
+    2010-07-10 20:41:33,125 INFO org.apache.hadoop.mapred.MapTask: Finished spill 2
+    2010-07-10 20:41:33,354 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+    2010-07-10 20:41:33,359 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+    2010-07-10 20:41:33,361 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+    2010-07-10 20:41:33,362 INFO org.apache.hadoop.io.compress.CodecPool: Got brand-new decompressor
+    2010-07-10 20:41:33,362 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 925614 bytes
+    2010-07-10 20:41:34,832 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+    2010-07-10 20:41:34,835 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 857190 bytes
+    2010-07-10 20:41:36,085 INFO org.apache.hadoop.mapred.Merger: Merging 3 sorted segments
+    2010-07-10 20:41:36,087 INFO org.apache.hadoop.mapred.Merger: Down to the last merge-pass, with 3 segments left of total size: 902202 bytes
+    ... another 100+ seconds in merge ...
+```
 
 You'd like to have only one spill per map task. Sez @tlipcon:
 
@@ -207,31 +207,31 @@ bq. "You're unlikely to see a big difference in performance unless you cut down
 
 To get to the magic one-spill number, run your job for long enough that some mappers complete. In the jobtracker window, follow the link under map/complete in the top table, and visit the counters for a couple tasks. Estimate from there the average map output records and bytes.
 
-<pre>
-  avg_record_size        := avg_map_output_bytes / avg_map_output_records
-  io.sort.spill.percent  := 0.80 # by default; leave this alone
-  io.sort.record.percent  > 16 / (16 + avg_record_size)
-  io.sort.mb              > map_output_bytes / ((1 - io.sort.record.percent) * io.sort.spill.percent)
-</pre>
+```
+    avg_record_size        := avg_map_output_bytes / avg_map_output_records
+    io.sort.spill.percent  := 0.80 # by default; leave this alone
+    io.sort.record.percent  > 16 / (16 + avg_record_size)
+    io.sort.mb              > map_output_bytes / ((1 - io.sort.record.percent) * io.sort.spill.percent)
+```
 
 * "Increasing io.sort.factor benefits reduce -- the last batch of streams (equal to io.sort.factor) are sent to the reduce function without merging" [2]
 * Is there some benefit to having io.sort.factor > num nodes?
 
-<pre>
-  def calc_io_sort_options map_output_bytes, map_output_recs
-    io_sort_record_percent = 16 / (16 + (map_output_bytes.to_f / map_output_recs.to_f))
-    # edge it up a little, and round
-    io_sort_record_percent = (105 * io_sort_record_percent).round / 100.0
-    io_sort_spill_percent  = 0.80
-    io_sort_bytes          = map_output_bytes / (io_sort_spill_percent * (1 - io_sort_record_percent))
-    io_sort_mb             = io_sort_bytes / (1024*1024)
-    { :io_sort_record_percent => io_sort_record_percent,
-      :io_sort_mb             => io_sort_mb,
-      :io_sort_factor         => io_sort_mb / 10.0,
-      :io_sort_spill_percent  => io_sort_spill_percent,
-    }
-  end
-</pre>
+```ruby
+    def calc_io_sort_options map_output_bytes, map_output_recs
+      io_sort_record_percent = 16 / (16 + (map_output_bytes.to_f / map_output_recs.to_f))
+      # edge it up a little, and round
+      io_sort_record_percent = (105 * io_sort_record_percent).round / 100.0
+      io_sort_spill_percent  = 0.80
+      io_sort_bytes          = map_output_bytes / (io_sort_spill_percent * (1 - io_sort_record_percent))
+      io_sort_mb             = io_sort_bytes / (1024*1024)
+      { :io_sort_record_percent => io_sort_record_percent,
+        :io_sort_mb             => io_sort_mb,
+        :io_sort_factor         => io_sort_mb / 10.0,
+        :io_sort_spill_percent  => io_sort_spill_percent,
+      }
+    end
+```
 
 
 h3. Reduce-side spills
@@ -243,19 +243,19 @@ h3. Reduce-side spills
 
 h3. JVM Tuning
 
-# -XX:+UseCompressedOops -XX:MaxNewSize=200m -XX:+UseParallelGC -XX:ParallelGCThreads=2
-# -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode
-# -server -XX:+AggressiveOpts 
-# export HADOOP_OPTS=-server 
+    # -XX:+UseCompressedOops -XX:MaxNewSize=200m -XX:+UseParallelGC -XX:ParallelGCThreads=2
+    # -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode
+    # -server -XX:+AggressiveOpts 
+    # export HADOOP_OPTS=-server 
 
 * Don't set the heap size to totally stack up the machine -- you need to leave some overhead for system cache and buffers -- it's possible to totally hose throughput by putting the machine into IO-contention hell.
 * If you are on Linux and run no swap, you *definitely* want to fix the vm @overcommit_memory@ and @overcommit_ratio@. If you do run swap, you should also look at the vm's @swappiness@ setting.
 * If you blindly increase the heap size, 
 
-#                     -XX:+UseParallelGC -XX:ParallelGCThreads=2 -XX:MaxNewSize=200m
-# -XX:SurvivorRatio=8 -XX:+UseParallelGC -XX:ParallelGCThreads=20 -XX:+UseParallelOldGC
-# Use NUMA if available (-XX:+UseNUMA)
-# and -XX:+UseTLAB
+    #                     -XX:+UseParallelGC -XX:ParallelGCThreads=2 -XX:MaxNewSize=200m
+    # -XX:SurvivorRatio=8 -XX:+UseParallelGC -XX:ParallelGCThreads=20 -XX:+UseParallelOldGC
+    # Use NUMA if available (-XX:+UseNUMA)
+    # and -XX:+UseTLAB
 
 * JVM to use -XX:+UseLargePages needs to set kernel options too: http://andrigoss.blogspot.com/2008/02/jvm-performance-tuning.html
 * 

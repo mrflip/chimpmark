@@ -1,4 +1,4 @@
-h1. ChimpMARK-2010: Big Data Benchmark on Real-World Datasets
+# ChimpMARK-2010: Big Data Benchmark on Real-World Datasets
 
 The ChimpMARK-2010 is a collection of massive real-world datasets, interesting real-world problems, and simple example code to solve them. Learn Big Data processing, benchmark your cluster, or compete on implementation!
 
@@ -14,84 +14,186 @@ Each problem is meant to a) to be a real-world task, b) to nonetheless encapsula
 
 **Note: this is a planning document: the repo contains no code yet**. There's a great variety of example code -- the foundations of what will appear here -- in the "wukong repo":http://github.com/infochimps/wukong/tree/master/examples/
 
-h2. Goals:
 
-* Datasets at full size should be about 30-200GB raw size on HDFS (that is, ready to process, not counting replication multiplier)
-* Run tasks times on 5%, 20% and 100% samples
-* Cluster sizes from 5 to 15 machines m1.small, c1.medium, m2.xl
-* Important that all datasets be *completely* unencumbered by copyright issues or controversy
-* Exercise CPU-bound, IO-bound and memory-bound operations
-* Tasks should be specified so that say Solr or Cassandra can show example code.
+______________________________________________________________________________
 
-h2. Corpora:
+## Datasets
 
-* **Graph**: "Wikipedia page links dataset,":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2596 a wikipedia linkgraph dataset provided by Henry Haselgrove. These files contain all links between proper english language Wikipedia pages. This will be converted to a list of [src_id dest_id] adjacency pairs and a lookup table [id => page information].
-* **Short Documents**: Want a table having an interesting ~200-char free-text field and several columns of metadata. (Basically, we wish we could use the twitter tweets corpus, but can't because of copyright.)  Enron email corpus? Web page headers? Should be 100-200 GB of 500-char records
-* **Long Documents**: Want a large interesting colxn of web pages: useful for parsing, link graph generation.  Should be 100-200 GB of 10k - 1M records.
-* **Log files**: "Wikipedia Traffic Statistics Dataset,":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2596 contains hourly wikipedia article traffic statistics dataset covering 7 month period from October 01 2008 to April 30 2009 (collected from the wikipedia squid proxy by Domas Mituzas). Will be denormalized into [date hour namespace title pageviews_that_hour page_id page_size], where the page_id has the same mapping as in the link graph.
-* **Spreadsheet-ish**: Want something in the traditional OLAP regime: a large table of several numeric columns and a few classification columns. Perhaps "Business and Industry Summary Data":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2342&categoryID=248 or "2003-2006 US Economic Data":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2341&categoryID=248
+The required datasets all bear open licenses and are available through [Infochimps](http://infochimps.com/)
 
-h2. Ideas for Tasks:
+* **Daily Weather** (`daily_weather`) -- NCDC Global Summary of US Daily Weather (GSOD), 1930-2011 (Public Domain). Contains about 20 numeric columns; the basis for several geospatial, timeseries and statistical questions.
+  - Weather Observations: weather station id, date, and observation data (temperature, wind speed and so forth).
+  - Weather Station metadata: weather station id, longitude/latitude/elevation, periods of service
+  - Weather Station spatial coverage: Polygons approximating each weather station's area of coverage by year. (Within each polygon, you are closer to the contained weather station than to any other weather station operating that year.) Contains a GeoJSON polygon feature describing the spatial extent along wiht the weather station id, year, and longitude/latitude/elevation.
+* **Wikipedia Corpus** (`wp_corpus`) -- The October 2011 dump of all english-language wikipedia articles in source (mediawiki) format. (This is the snapshot of each page's current state, not the larger dataset containing all edits.)
+  - `page title | page id | redirect | extended abstract | lng | lat | keywords | text`
+* **Wikipedia Extracted Facts** (`wp_extraction`)
+* **Wikipedia Pagelinks** (`wp_linkgraph`)
+  - `page_id | dest,dest,dest`
+* **Wikipedia Pageview logs** (`wp_weblogs`)
+  - `page_id | date | hour | count`
+  
+### Size and Shape
 
-|_. Problem                                      | Dataset                 | Operations exercised                               |
-|                                                |                         |                                                    |
-|_. Cat wrangling                                |                         |                                                    |
-|  sort on numeric field, 1k-char records        | wp traffic              | ORDER                                              |
-|  sort on numeric field, 6 numeric columns      | spreadsheet             | ORDER                                              |
-|  sort wp by page titles                        | long documents          | ORDER                                              |
-|  create inverted index                         | long documents          | tokenize, group                                    |
-|  word count (simple tokenization)              | long documents          | tokenize, group, count                             |
-|  word count (advanced tokenization)            | long documents          | complex code, group                                |
-|  uniform (x% random sample)                    | short documents         | FILTER                                             |
-|  uniform (x% random sample)                    | long documents          | FILTER                                             |
-|  make a single .gz file on non-HDFS            | human genome?           | want higher entropy                                |
-|  make a single .gz file on non-HDFS            | graph                   | want very low entropy                              |
-|  simple filter on 10k files, most smaller than block size | constructed for task | job startup time                           |
-|  uniq -c                                       | short documents         | distinct, count                                    |
-|  uniq -c                                       | long documents          | distinct, count                                    |
-|                                                |                         |                                                    |
-|_. Graph                                        |                         |                                                    |
-|  turn adjacency pairs into adj list            | wp graph                | GROUP, no combiner                                 |
-|  given adj. pairs, get counts of in-links and out-links  | wp graph      | GROUP and COUNT, no combiner                       |
-|  join the counts of in-links and out-links by node | wp graph            | JOIN that is 1:1                                   |
-|  pagerank                                      | wp graph                | workflow; complex code                             |
-|  breadth first search                          | wp graph                | JOIN, very memory-intensive                        |
-|  1-clique                                      | breadth-first search    | JOIN huge on big with low overlap                  |
-|  sub-universe (get random sample, and corr. records from assoc datasets) | graph + short documents | complex code             |
-|  put aggregated counts on adjacency list       | wp graph + wp traffic   | JOIN huge on big with 100% overlap                 |
-|                                                |                         |                                                    |
-|_. Filter                                       |                         |                                                    |
-|  filter on numeric criteria                    | spreadsheet             | FILTER                                             |
-|  split on simple criteria into 5 files: every record to exactly 1 file   | spreadsheet | SPLIT                                |
-|  split on simple criteria into 5 files: records could go to some, none or any of the files | spreadsheet | SPLIT              |
-|  regex search                                  | short documents         | FILTER, MATCHES                                    |
-|  100 keywords                                  | short documents         | FILTER, MATCHES                                    |
-|  100 keywords                                  | long documents          | FILTER, MATCHES                                    |
-|  30,000 keywords                               | short documents         | FILTER, trie?                                      |
-|  1000 keywords + huge inverted index           | inverted index          | fragment replicate JOIN (JOIN big on tiny)         |
-|                                                |                         |                                                    |
-|_. Parse                                        |                         |                                                    |
-|  extract title, keyword, desc from HTML head   | long documents          | complex code                                       |
-|  extract all a and img etc URLs from HTML      | long documents          | complex code; CPU-bound                            |
-|                                                |                         |                                                    |
-|_. OLAP / Stats                                 |                         |                                                    |
-|  simple statistics: avg, stdev, counts         | spreadsheet             | GROUP, FOREACH                                     |
-|  top-N: find top 100 pages by views per day    | wp traffic statistics   | GROUP, nested FOREACH                              |
-|  something very CPU-intensive in foreach       | [some bio dataset]      | CPU-intensive in inner loop                        |
-|  linear regression                             | spreadsheet             | ..                                                 |
-|  assign percentiles                            | spreadsheet             | ..                                                 |
-|                                                |                         |                                                    |
-|_. Geo                                          |                         |                                                    |
-|                                                |                         |                                                    |
-|   take (x,y) pairs giving points of interest; for each point, roll up all points within radius R | weather stations + ML ballparks |   |
-|                                                |                         |                                                    |
-|_. Misc                                         |                         |                                                    |
-|  render as JSON                                | spreadsheet?            | stream                                             |
-|                                                |                         |                                                    |
-|_. Infrastructure                               |                         |                                                    |
-|  count the characters in a single line file    | tiny file               | process overhead                                   |
+    Dataset             Rows    GB      RecSz   +/-     Skew
+    -------             ----    --      -----   ---     ----
+    Daily Weather       xx      xx      xx      xx      low 
+    WP Corpus           xx      xx      xx      xx      
+    WP Page Graph       xx
+    WP Page Views
 
-h2. Ideas for Atomic Operations to be exercised
+
+
+## Challenges
+
+### Statistical Summary of Global Weather Trends
+
+Send weather observations to macro tiles, and calculate statistics (min, max, average, stdev, mode, median and percentiles).
+
+* Join weather data and voronoi tiles; dispatch 
+
+* calculate same but on all rows
+
+_demonstrates_: support for statistical analysis; high skew reduce
+
+### Similarity
+
+### Anomaly Detection on a Timeseries
+
+Pageview anomalies
+
+Sessionize pageviews
+
+### Logistic Regression
+
+Which pages are correlated with the weather?
+
+### Simple Geopatial Rollup of Weather Data
+
+
+### Pagerank
+
+
+_Demonstrates_: iterative workflows
+
+### Enumerate Triangles (Clustering Coefficient)
+
+_demonstrates_: large amount of midstream data
+
+
+* count in- and out-degree for each noe; filter out nodes with total degree <= 1.
+* assemble the min-degree-ordered adjacency list (maps node to all its in- or out-neighbors of higher degree)
+* emit cross product of neighbor+neighbor pairs
+* intersect to find only triangles
+
+### Clustering
+
+### Document Clustering 
+
+* Calculate top-k TF/IDF terms (based on threshold importance and max size)
+* use minhashing into LSH
+  - For i = 1...m
+    - Generate a random order h i on words
+    - m hi(u) = argmin {hi(w) | w  Bu}
+
+* Tokenize the documents (following mildly complicated rules)
+* Generate wordbag for each doc, stripping out words that occur > hi_thresh (fixed, and these stopwords are given in advance, or you can enumerate and then chop) and stripping out words that occur < lo_thresh in full corpus
+* (want circa 50_000 terms? 50,000 terms . 3,000,000 documents = 150 B cells
+
+* count of terms in document, count of usages in document
+* ent:   `-sum(s*log(s))/log(length(s))` (relative entropy of all sizes of the corpus parts)
+
+For each term:
+* Rg:    range -- count of docs it occurs in
+* f:     freq (fractional count in whole corpus), dispersion (), log likelihood
+* stdev: standard deviation
+* chisq: chi-squared
+* disp:  Julliand's D -- `1 - ( (sd(v/s) / mean(v/s)) / sqrt(length(v/s) - 1) )`
+* IDF:   `log_2( N / Rg )`
+
+http://www.linguistics.ucsb.edu/faculty/stgries/research/2008_STG_Dispersion_IJCL.pdf
+
+### Co-ocurrence Graph
+
+See Mining of Massive Datasets p208 - a-priori algorithm...
+step I calculate frequent items
+
+Step II:
+1. For each basket, look in the frequent-items table to see which of its items are frequent.
+2. In a double loop, generate all frequent pairs.
+3. For each frequent pair, add one to its count in the data structure used to
+store counts.
+4. Finally, at the end of the second pass, examine the structure of counts to determine which pairs are frequent.
+
+Park, Chen, and Yu (PCY)
+
+In step I, keep a count of items. Also, for each piar take hash and bump the count in that bucket.
+
+We can define the set of candidate pairs C2 to be those pairs {i, j} such that:
+1. i and j are frequent items.
+2. {i, j} hashes to a frequent bucket.
+For even better results, use two or more hashes (each in a separate hash table)
+
+
+## Tasks:
+
+    |_. Problem                                      | Dataset                 | Operations exercised                               |
+    |                                                |                         |                                                    |
+    |_. Cat wrangling                                |                         |                                                    |
+    |  total sort on numeric field, small records    | wikistats               | ORDER                                              |
+    |  total sort on numeric field, medium records   | weather tiles           | ORDER                                              |
+    |  total sort on text field (wp page titles)     | long documents          | ORDER                                              |
+    |  uniform (x% random sample)                    | short documents         | FILTER                                             |
+    |  uniform (x% random sample)                    | long documents          | FILTER                                             |
+    |  prepare .tsv.gz files of 1G +/- 10%           | pagerank                | STORE, compress (very low entropy)                 |
+    |  .gz compress in-place those files             | pagerank.gz             | STORE, compress (very high entropy)                |
+    |  simple transform on 100k distinct files       | raw weather data        | job startup time                                   |
+    |  uniq -c                                       | short documents         | distinct, count                                    |
+    |  uniq -c                                       | long documents          | distinct, count                                    |
+    |                                                |                         |                                                    |
+    |_. Text                                         |                         |                                                    |
+    |  create inverted index                         | long documents          | tokenize, group                                    |
+    |  word count (simple tokenization)              | long documents          | tokenize, group, count                             |
+    |  word count (advanced tokenization)            | long documents          | complex code, group                                |
+    |                                                |                         |                                                    |
+    |_. Graph                                        |                         |                                                    |
+    |  edge pairs => adj list                        | wp graph                | GROUP                                              |
+    |  in-degree + out degree for each node          | wp graph                | 1:1 JOIN                                           |
+    |  degree-sorted adj list (w/ degrees)           | wp graph                | FOREACH                                            |
+    |  pagerank                                      | wp graph                | workflow; complex code                             |
+    |  sub-universe                                  | graph + short documents | complex code                                       |
+    |  put aggregated counts on adjacency list       | wp graph + wikistats    | JOIN huge on big with 100% overlap                 |
+    |                                                |                         |                                                    |
+    |_. Filter                                       |                         |                                                    |
+    |  filter on numeric criteria                    | weather                 | FILTER                                             |
+    |  split on redirect/not                         | wp corpus               | SPLIT                                              |
+    |  regex search                                  | short documents         | FILTER, MATCHES                                    |
+    |  100 keywords                                  | short documents         | FILTER, MATCHES                                    |
+    |  100 keywords                                  | long documents          | FILTER, MATCHES                                    |
+    |  100,000 keywords + huge inverted index        | inverted index          | fragment replicate JOIN (JOIN big on tiny)         |
+    |                                                |                         |                                                    |
+    |_. Parse                                        |                         |                                                    |
+    |  extract title, keyword, desc from HTML head   | long documents          | complex code                                       |
+    |  extract all a and img etc URLs from HTML      | long documents          | complex code; CPU-bound                            |
+    |                                                |                         |                                                    |
+    |_. OLAP / Stats                                 |                         |                                                    |
+    |  simple statistics: avg, stdev, counts         | weather                 | GROUP, FOREACH                                     |
+    |  top-N: find top 100 pages by views per day    | wikistats               | GROUP, nested FOREACH                              |
+    |  something very CPU-intensive in foreach       | [some bio dataset]      | CPU-intensive in inner loop                        |
+    |  linear regression                             | weather                 | ..                                                 |
+    |  assign percentiles                            | weather                 | ..                                                 |
+    |                                                |                         |                                                    |
+    |_. Geo                                          |                         |                                                    |
+    |                                                |                         |                                                    |
+    |   take (x,y) pairs giving points of interest; for each point, roll up all points within radius R | weather stations + ML ballparks |   |
+    |                                                |                         |                                                    |
+    |_. Misc                                         |                         |                                                    |
+    |  render as JSON                                | spreadsheet?            | stream                                             |
+    |                                                |                         |                                                    |
+    |_. Infrastructure                               |                         |                                                    |
+    |  count the characters in a single line file    | tiny file               | process overhead                                   |
+
+## Ideas for Atomic Operations to be exercised
 
 * group all
 * group by
@@ -124,12 +226,11 @@ h2. Ideas for Atomic Operations to be exercised
 
 * parse XXX
 
+## Detailed Dataset Descriptions
 
-h2. Detailed Dataset Descriptions
+### Graph: wikidata/wikilinks (1.1G)
 
-h3. Graph: wikidata/wikilinks (1.1G)
-
-"Wikipedia page links dataset":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2596 contains a wikipedia linkgraph dataset provided by Henry Haselgrove. These files contain all links between proper english language Wikipedia pages, that is pages in "namespace 0". This includes disambiguation pages and redirect pages.   [ convert this to adj. pairs -- or to be directly loadable in pig ] In links-simple-sorted.txt, there is one line for each page that has links from it. The format of the lines is:
+[Wikipedia page links dataset](http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2596) contains a wikipedia linkgraph dataset provided by Henry Haselgrove. These files contain all links between proper english language Wikipedia pages, that is pages in "namespace 0". This includes disambiguation pages and redirect pages.   [ convert this to adj. pairs -- or to be directly loadable in pig ] In links-simple-sorted.txt, there is one line for each page that has links from it. The format of the lines is:
 <pre><code>
       from1: to11 to12 to13 ...
       from2: to21 to22 to23 ...
@@ -137,46 +238,52 @@ h3. Graph: wikidata/wikilinks (1.1G)
 </code></pre>
   where from1 is an integer labelling a page that has links from it, and to11 to12 to13 ... are integers labelling all the pages that the page links to. To find the page title that corresponds to integer n, just look up the n-th line in the file titles-sorted.txt.
 
-h3. Short Documents 1: ???
+### Short Documents 1: ???
 
 uniform ~150-200 char fields + metadata
 
-h3. Long Documents: Large interesting colxn of web pages
+### Long Documents: Large interesting colxn of web pages
 
 typically 10k - 1M files
 
-h3. Log
+### Log
 
-h4. Wikipedia Traffic Statistics Dataset
+#### Wikipedia Traffic Statistics Dataset
 
   Contains hourly wikipedia article traffic statistics dataset covering 7 month period from October 01 2008 to April 30 2009, this data is regularly logged from the wikipedia squid proxy by Domas Mituzas.
   Each log file is named with the date and time of collection: pagecounts-20090430-230000.gz
   Each line has 4 fields: projectcode, pagename, pageviews, bytes
 
-<pre><code>
-        en Barack_Obama                         997 123091092
+```
+    en Barack_Obama                         997 123091092
 	en Barack_Obama%27s_first_100_days        8 850127
 	en Barack_Obama,_Jr                       1 144103
 	en Barack_Obama,_Sr.                     37 938821
 	en Barack_Obama_%22HOPE%22_poster         4 81005
 	en Barack_Obama_%22Hope%22_poster         5 102081
-</code></pre>
+```
 
    we should denormalize into
 
-<pre><code>
-        date 	hour	en Barack_Obama                         997 123091092
+```
+    date 	hour	en Barack_Obama                         997 123091092
 	date 	hour	en Barack_Obama%27s_first_100_days        8 850127
 	date 	hour	en Barack_Obama,_Jr                       1 144103
 	date 	hour	en Barack_Obama,_Sr.                     37 938821
 	date 	hour	en Barack_Obama_%22HOPE%22_poster         4 81005
 	date 	hour	en Barack_Obama_%22Hope%22_poster         5 102081
-</code></pre>
+```
 
 h3. Spreadsheet-ish: (Business and Industry Summary Data?)
 
 Choices:
-* "Business and Industry Summary Data":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2342&categoryID=248
-* "2003-2006 US Economic Data":http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2341&categoryID=248
+* [Business and Industry Summary Data](http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2342&categoryID=248)
+* [2003-2006 US Economic Data](http://developer.amazonwebservices.com/connect/entry.jspa?externalID=2341&categoryID=248)
 
 
+Identity mapper         Wukong          `which cat`             pig
+Identity reducer        wukong          `which cat`             pig
+* no skew
+* data/reducer > ram
+
+Do a sort|uniq on 150GB

@@ -1,33 +1,7 @@
+* http://www.cloudera.com/resource/hadoop-world-2011-presentation-slides-hadoop-and-performance
+* https://github.com/SWIMProjectUCB/SWIM/wiki
+* http://cloud.github.com/downloads/SWIMProjectUCB/SWIM/MapReduceWorkloadMASCOTSCameraReady.pdf
 
-
-______________________________________________________________________________
-
-## Datasets
-
-### Overview
-
-* Daily Weather -- NCDC Global Summary of Daily Weather (GSOD)
-  - Weather Station metadata: 
-    `usno_id | wmo_id | lng | lat | elev | date_beg | date_end`
-  - Weather Observations
-    `usno_id | wmo_id | date | temp | pressure | ...`
-  - Coverage cells: Polygons approximating weather stations' area of coverage, by year
-    `usno_id | wmo_id | ctr_lng | ctr_lat | [[lng,lat],[lng,lat],...]`
-* Wikipedia Corpus
-  - `page title | page id | redirect | extended abstract | lng | lat | keywords | text`
-* Wikipedia Pagelinks
-  - `page_id | dest,dest,dest`
-* Wikipedia Pageview logs
-  - `page_id | date | hour | count`
-  
-### Size and Shape
-
-    Dataset             Rows    GB      RecSz   +/-     Skew
-    -------             ----    --      -----   ---     ----
-    Daily Weather       xx      xx      xx      xx      low 
-    WP Corpus           xx      xx      xx      xx      
-    WP Page Graph       xx
-    WP Page Views
     
 
 ### High-level
@@ -41,80 +15,6 @@ Domains:
 * **Log Data**
 * **Traditional OLAP reporting**
 * **Timeseries Data**
-
-## Challenges
-
-### Statistical Summary Global Weather 
-
-Send weather observations to macro tiles, and calculate statistics (min, max, average, stdev, mode, median and percentiles).
-
-* Join weather data and voronoi tiles; dispatch 
-
-* calculate same but on all rows
-
-### Anomaly Detection on a Timeseries
-
-Pageview anomalies
-
-Sessionize pageviews
-
-### Logistic Regression
-
-Which pages are correlated with the weather?
-
-### Pagerank
-
-### Enumerate Triangles (Clustering Coefficient)
-
-### Document Clustering 
-
-* Tokenize the documents (following mildly complicated rules)
-* Generate wordbag for each doc, stripping out words that occur > hi_thresh (fixed, and these stopwords are given in advance, or you can enumerate and then chop) and stripping out words that occur < lo_thresh in full corpus
-* (want circa 50_000 terms? 50,000 terms . 3,000,000 documents = 150 B cells
-
-* count of terms in document, count of usages in document
-* ent:   `-sum(s*log(s))/log(length(s))` (relative entropy of all sizes of the corpus parts)
-
-For each term:
-* Rg:    range -- count of docs it occurs in
-* f:     freq (fractional count in whole corpus), dispersion (), log likelihood
-* stdev: standard deviation
-* chisq: chi-squared
-* disp:  Julliand's D -- `1 - ( (sd(v/s) / mean(v/s)) / sqrt(length(v/s) - 1) )`
-* IDF:   `log_2( N / Rg )`
-
-
-http://www.linguistics.ucsb.edu/faculty/stgries/research/2008_STG_Dispersion_IJCL.pdf
-
-
-### Co-ocurrence Graph
-
-See Mining of Massive Datasets p208 - a-priori algorithm...
-step I calculate frequent items
-
-Step II:
-1. For each basket, look in the frequent-items table to see which of its items are frequent.
-2. In a double loop, generate all frequent pairs.
-3. For each frequent pair, add one to its count in the data structure used to
-store counts.
-4. Finally, at the end of the second pass, examine the structure of counts to determine which pairs are frequent.
-
-Park, Chen, and Yu (PCY)
-
-In step I, keep a count of items. Also, for each piar take hash and bump the count in that bucket.
-
-We can define the set of candidate pairs C2 to be those pairs {i, j} such that:
-1. i and j are frequent items.
-2. {i, j} hashes to a frequent bucket.
-For even better results, use two or more hashes (each in a separate hash table)
-
-
-### Shingling of Documents
-
-
-
-### K-Means Clustering
-
 
 __________________________________________________________________________
 
@@ -241,6 +141,17 @@ CCores = cluster cores
 Midstream size ~= 4 x CRam -- 1 x CRam -- 0.5 x CRam
 
 
+
+
 ## Spirit of the Game
 
 * **Generic**: you must not draw on source domain knowledge. You can capitalize on the coarse structure 
+
+## What to measure
+
+Would like to measure:
+
+* time to (pending_map_tasks == 0) and (running_map_tasks / cluster_map_tasks ~ 0.5)
+* map tasks complete
+* complete_reduce tasks / total_reduce_tasks =~ 0.8
+* reduce_tasks complete
